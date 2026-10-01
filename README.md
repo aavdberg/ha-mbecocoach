@@ -12,7 +12,7 @@ Points, levels, challenges, duels, activity history, weekly reports, coach event
 
 ## Install and configure
 
-Add `https://github.com/aavdberg/ha-mbecocoach` as a custom integration repository in HACS, or copy `custom_components/mbecocoach` into your Home Assistant `config/custom_components` folder, then restart Home Assistant. Under **Settings → Devices & services → Add integration**, select **Mercedes Eco Coach**. Provide your 17-character VIN and an authorized Eco Coach bearer token (without the `Bearer ` prefix). Configuration tests the observed statistics endpoint before creating the entry. A rejected token triggers the Home Assistant reauthentication flow.
+For this unreleased development version, copy `custom_components/mbecocoach` **from the `dev` branch** into your Home Assistant `config/custom_components` folder, then restart Home Assistant. HACS installation will be available after an explicit release on `main`; the default branch does not yet contain the integration. Under **Settings → Devices & services → Add integration**, select **Mercedes Eco Coach**. Provide your 17-character VIN and an authorized Eco Coach bearer token (without the `Bearer ` prefix). Configuration tests the observed statistics endpoint before creating the entry. A rejected token triggers the Home Assistant reauthentication flow.
 
 The token is stored in Home Assistant's config entry storage and is never written to logs by this integration. The host is fixed; arbitrary user-supplied endpoints are deliberately not accepted. No real Mercedes credentials are required by repository tests.
 

@@ -58,3 +58,22 @@ async def test_rejected_token_is_not_saved() -> None:
         client.return_value.async_personal_statistics = AsyncMock(side_effect=EcoCoachAuthError())
         result = await flow.async_step_user({CONF_VIN: VIN, CONF_TOKEN: "expired"})
     assert result["errors"] == {"base": "invalid_auth"}
+
+
+@pytest.mark.asyncio
+async def test_reauth_updates_only_token() -> None:
+    """Token replacement must retain the existing VIN."""
+    flow = EcoCoachConfigFlow()
+    flow.hass = MagicMock()
+    flow._reauth_entry = MagicMock(data={CONF_VIN: VIN, CONF_TOKEN: "old"})
+    flow.async_update_reload_and_abort = MagicMock(return_value={"type": "abort"})
+    with (
+        patch("custom_components.mbecocoach.config_flow.async_get_clientsession"),
+        patch("custom_components.mbecocoach.config_flow.EcoCoachClient") as client,
+    ):
+        client.return_value.async_personal_statistics = AsyncMock()
+        result = await flow.async_step_reauth_confirm({CONF_TOKEN: " replacement "})
+    assert result == {"type": "abort"}
+    flow.async_update_reload_and_abort.assert_called_once_with(
+        flow._reauth_entry, data_updates={CONF_TOKEN: "replacement"}
+    )
