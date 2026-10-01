@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   ruff:
+    name: Ruff (lint + format check)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +23,7 @@ jobs:
       - run: ruff format --check custom_components tests
 
   pytest:
+    name: Pytest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
