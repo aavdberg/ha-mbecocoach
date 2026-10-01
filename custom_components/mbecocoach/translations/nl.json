@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mercedes Eco Coach",
+        "description": "Voer je VIN en een bestaand Eco Coach-bearertoken in. Automatisch inloggen en tokenvernieuwing worden nog niet ondersteund.",
+        "data": {"vin": "Voertuigidentificatienummer (VIN)", "token": "Bearertoken"}
+      },
+      "reauth_confirm": {
+        "title": "Eco Coach-token vernieuwen",
+        "description": "Voer een nieuw Eco Coach-bearertoken in voor deze VIN.",
+        "data": {"token": "Bearertoken"}
+      }
+    },
+    "error": {
+      "invalid_vin": "Voer een geldig VIN van 17 tekens in.",
+      "invalid_token": "Voer een token in.",
+      "invalid_auth": "Het token is afgewezen of verlopen.",
+      "cannot_connect": "De Eco Coach-statistiekserver is niet bereikbaar.",
+      "invalid_response": "De statistiekserver gaf een onbekend antwoord."
+    },
+    "abort": {
+      "already_configured": "Deze VIN is al geconfigureerd.",
+      "reauth_successful": "Token bijgewerkt."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "drive_score": {"name": "Rijscore"},
+      "avg_consumption": {"name": "Gemiddeld verbruik"},
+      "saved_emissions": {"name": "Bespaarde uitstoot"}
+    }
+  }
+}

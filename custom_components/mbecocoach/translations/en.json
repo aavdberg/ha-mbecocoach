@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mercedes Eco Coach",
+        "description": "Enter your VIN and an existing Eco Coach bearer token. Automatic login and token refresh are not yet supported.",
+        "data": {"vin": "Vehicle identification number (VIN)", "token": "Bearer token"}
+      },
+      "reauth_confirm": {
+        "title": "Renew Eco Coach token",
+        "description": "Enter a new Eco Coach bearer token for this VIN.",
+        "data": {"token": "Bearer token"}
+      }
+    },
+    "error": {
+      "invalid_vin": "Enter a valid 17-character VIN.",
+      "invalid_token": "Enter a non-empty token.",
+      "invalid_auth": "The token was rejected or has expired.",
+      "cannot_connect": "The Eco Coach statistics server could not be reached.",
+      "invalid_response": "The statistics server returned an unsupported response."
+    },
+    "abort": {
+      "already_configured": "This VIN is already configured.",
+      "reauth_successful": "Token updated."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "drive_score": {"name": "Drive score"},
+      "avg_consumption": {"name": "Average consumption"},
+      "saved_emissions": {"name": "Saved emissions"}
+    }
+  }
+}
