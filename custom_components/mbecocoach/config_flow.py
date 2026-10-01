@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -36,7 +37,9 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(vin)
                 self._abort_if_unique_id_configured()
                 try:
-                    await EcoCoachClient(async_get_clientsession(self.hass), token).async_personal_statistics(vin)
+                    await EcoCoachClient(
+                        async_get_clientsession(self.hass), token, ZoneInfo(self.hass.config.time_zone)
+                    ).async_personal_statistics(vin)
                 except EcoCoachAuthError:
                     errors["base"] = "invalid_auth"
                 except EcoCoachConnectionError:
@@ -68,9 +71,9 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             else:
                 try:
-                    await EcoCoachClient(async_get_clientsession(self.hass), token).async_personal_statistics(
-                        self._reauth_entry.data[CONF_VIN]
-                    )
+                    await EcoCoachClient(
+                        async_get_clientsession(self.hass), token, ZoneInfo(self.hass.config.time_zone)
+                    ).async_personal_statistics(self._reauth_entry.data[CONF_VIN])
                 except EcoCoachAuthError:
                     errors["base"] = "invalid_auth"
                 except EcoCoachConnectionError:

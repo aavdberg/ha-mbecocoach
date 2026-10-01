@@ -12,16 +12,23 @@ from .const import CONF_VIN, DOMAIN
 from .coordinator import EcoCoachCoordinator
 
 SENSORS = (
-    SensorEntityDescription(key="drive_score", translation_key="drive_score", icon="mdi:car-speed-limiter"),
+    SensorEntityDescription(
+        key="drive_score",
+        translation_key="drive_score",
+        icon="mdi:car-speed-limiter",
+        native_unit_of_measurement="%",
+    ),
     SensorEntityDescription(
         key="avg_consumption",
         translation_key="avg_consumption",
         icon="mdi:lightning-bolt",
+        native_unit_of_measurement="kWh/100 km",
     ),
     SensorEntityDescription(
         key="saved_emissions",
         translation_key="saved_emissions",
         icon="mdi:leaf",
+        native_unit_of_measurement="kg",
     ),
 )
 
