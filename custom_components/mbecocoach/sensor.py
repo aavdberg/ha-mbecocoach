@@ -13,23 +13,38 @@ from .coordinator import EcoCoachCoordinator
 
 SENSORS = (
     SensorEntityDescription(
-        key="drive_score",
+        key="personal_drive_score",
         translation_key="drive_score",
         icon="mdi:car-speed-limiter",
         native_unit_of_measurement="%",
     ),
     SensorEntityDescription(
-        key="avg_consumption",
+        key="personal_avg_consumption",
         translation_key="avg_consumption",
         icon="mdi:lightning-bolt",
         native_unit_of_measurement="kWh/100 km",
     ),
     SensorEntityDescription(
-        key="saved_emissions",
+        key="personal_saved_emissions",
         translation_key="saved_emissions",
         icon="mdi:leaf",
         native_unit_of_measurement="kg",
     ),
+)
+
+PERIOD_SENSORS = tuple(
+    SensorEntityDescription(
+        key=f"{period}_{metric}",
+        translation_key=f"{period}_{metric}",
+        icon=icon,
+        native_unit_of_measurement=unit,
+    )
+    for period in ("daily", "weekly", "monthly")
+    for metric, icon, unit in (
+        ("drive_score", "mdi:car-speed-limiter", "%"),
+        ("consumption", "mdi:lightning-bolt", "kWh/100 km"),
+        ("points", "mdi:star-circle", None),
+    )
 )
 
 
@@ -37,7 +52,8 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: EcoCoachConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Register observed metrics."""
-    async_add_entities(EcoCoachSensor(entry.runtime_data, entry, description) for description in SENSORS)
+    descriptions = (*SENSORS, *PERIOD_SENSORS)
+    async_add_entities(EcoCoachSensor(entry.runtime_data, entry, description) for description in descriptions)
 
 
 class EcoCoachSensor(CoordinatorEntity[EcoCoachCoordinator], SensorEntity):
@@ -51,7 +67,8 @@ class EcoCoachSensor(CoordinatorEntity[EcoCoachCoordinator], SensorEntity):
         """Initialize a VIN-scoped sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = f"{entry.data[CONF_VIN]}_{description.key}"
+        key = description.key.removeprefix("personal_")
+        self._attr_unique_id = f"{entry.data[CONF_VIN]}_{key}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.data[CONF_VIN])},
             "name": f"Eco Coach {entry.data[CONF_VIN]}",
@@ -61,4 +78,6 @@ class EcoCoachSensor(CoordinatorEntity[EcoCoachCoordinator], SensorEntity):
     @property
     def native_value(self) -> float | None:
         """Return the captured metric or unknown when absent."""
-        return getattr(self.coordinator.data, self.entity_description.key, None)
+        period, _, metric = self.entity_description.key.partition("_")
+        data = getattr(self.coordinator.data, period, None)
+        return getattr(data, metric, None)

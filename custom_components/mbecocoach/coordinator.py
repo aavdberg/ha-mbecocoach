@@ -8,14 +8,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import EcoCoachAuthError, EcoCoachClient, EcoCoachError, PersonalStatistics
+from .api import EcoCoachAuthError, EcoCoachClient, EcoCoachData, EcoCoachError
 from .const import UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class EcoCoachCoordinator(DataUpdateCoordinator[PersonalStatistics]):
-    """Refresh personal statistics every 15 minutes."""
+class EcoCoachCoordinator(DataUpdateCoordinator[EcoCoachData]):
+    """Refresh the captured personal and period summaries every 15 minutes."""
 
     def __init__(self, hass: HomeAssistant, client: EcoCoachClient, vin: str) -> None:
         """Initialize the coordinator."""
@@ -23,10 +23,12 @@ class EcoCoachCoordinator(DataUpdateCoordinator[PersonalStatistics]):
         self._client = client
         self._vin = vin
 
-    async def _async_update_data(self) -> PersonalStatistics:
+    async def _async_update_data(self) -> EcoCoachData:
         """Retrieve the latest statistics."""
         try:
-            return await self._client.async_personal_statistics(self._vin)
+            personal = await self._client.async_personal_statistics(self._vin)
+            daily, weekly, monthly = await self._client.async_period_statistics(self._vin)
+            return EcoCoachData(personal, daily, weekly, monthly)
         except EcoCoachAuthError as err:
             raise ConfigEntryAuthFailed("Eco Coach token expired or was rejected") from err
         except EcoCoachError as err:

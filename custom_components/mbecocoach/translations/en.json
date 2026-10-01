@@ -28,7 +28,16 @@
     "sensor": {
       "drive_score": {"name": "Drive score"},
       "avg_consumption": {"name": "Average consumption"},
-      "saved_emissions": {"name": "Saved emissions"}
+      "saved_emissions": {"name": "Saved emissions"},
+      "daily_drive_score": {"name": "Daily drive score"},
+      "daily_consumption": {"name": "Daily electric consumption"},
+      "daily_points": {"name": "Daily points"},
+      "weekly_drive_score": {"name": "Weekly drive score"},
+      "weekly_consumption": {"name": "Weekly electric consumption"},
+      "weekly_points": {"name": "Weekly points"},
+      "monthly_drive_score": {"name": "Monthly drive score"},
+      "monthly_consumption": {"name": "Monthly electric consumption"},
+      "monthly_points": {"name": "Monthly points"}
     }
   }
 }

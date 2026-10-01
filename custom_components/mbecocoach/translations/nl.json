@@ -28,7 +28,16 @@
     "sensor": {
       "drive_score": {"name": "Rijscore"},
       "avg_consumption": {"name": "Gemiddeld verbruik"},
-      "saved_emissions": {"name": "Bespaarde uitstoot"}
+      "saved_emissions": {"name": "Bespaarde uitstoot"},
+      "daily_drive_score": {"name": "Dagelijkse rijscore"},
+      "daily_consumption": {"name": "Dagelijks stroomverbruik"},
+      "daily_points": {"name": "Dagelijkse punten"},
+      "weekly_drive_score": {"name": "Wekelijkse rijscore"},
+      "weekly_consumption": {"name": "Wekelijks stroomverbruik"},
+      "weekly_points": {"name": "Wekelijkse punten"},
+      "monthly_drive_score": {"name": "Maandelijkse rijscore"},
+      "monthly_consumption": {"name": "Maandelijks stroomverbruik"},
+      "monthly_points": {"name": "Maandelijkse punten"}
     }
   }
 }

@@ -14,7 +14,9 @@ from custom_components.mbecocoach.api import (
     EcoCoachConnectionError,
     EcoCoachError,
     EcoCoachRateLimitError,
+    PeriodStatistics,
     PersonalStatistics,
+    parse_period_statistics,
     parse_statistics,
     statistics_period,
 )
@@ -82,6 +84,50 @@ def test_statistics_period_dst_change() -> None:
     assert params["compareFrom"] == "2026-10-18T22:00:00Z"
 
 
+def test_parse_period_statistics() -> None:
+    """Read only period aggregates, never trip or chart payloads."""
+    period = {
+        "driveScoreStatistics": {"driveScore": 76},
+        "consumptionStatistics": {"electricConsumption": {"value": 22.0, "unit": "KWH100KM"}},
+        "pointsSummary": {"sum": {"points": 2675}},
+        "consumptionChartDataset": [{"x": 1, "y": 2}],
+    }
+    payload = {"dailyStatistics": period, "weeklyStatistics": period, "monthlyStatistics": period}
+    result = parse_period_statistics(payload)
+    assert result == (PeriodStatistics(76, 22.0, 2675),) * 3
+
+
+def test_parse_period_optional_fields() -> None:
+    """Other fuel types and absent optional fields never become fabricated readings."""
+    period = {"consumptionStatistics": {"electricConsumption": {"value": 5, "unit": "L100KM"}}}
+    result = parse_period_statistics({"dailyStatistics": period, "weeklyStatistics": {}, "monthlyStatistics": {}})
+    assert result == (PeriodStatistics(None, None, None),) * 3
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        {"dailyStatistics": {}},
+        {"dailyStatistics": [], "weeklyStatistics": {}, "monthlyStatistics": {}},
+        {
+            "dailyStatistics": {"driveScoreStatistics": {"driveScore": "bad"}},
+            "weeklyStatistics": {},
+            "monthlyStatistics": {},
+        },
+        {
+            "dailyStatistics": {"pointsSummary": {"sum": {"points": True}}},
+            "weeklyStatistics": {},
+            "monthlyStatistics": {},
+        },
+    ],
+)
+def test_parse_period_rejects_bad_data(payload: object) -> None:
+    """Reject malformed documented period fields without success-shaped defaults."""
+    with pytest.raises(EcoCoachError):
+        parse_period_statistics(payload)
+
+
 def make_client(status: int, payload: object = None) -> tuple[EcoCoachClient, MagicMock]:
     """Build an HTTP context manager with no network requests."""
     response = MagicMock(status=status)
@@ -107,6 +153,17 @@ async def test_personal_statistics_request() -> None:
         "ecocoach-platform": "iOS",
     }
     assert set(kwargs["params"]) == {"from", "to", "compareFrom", "compareTo"}
+
+
+@pytest.mark.asyncio
+async def test_period_request_has_no_query_parameters() -> None:
+    """The captured statistics/all call has no query string."""
+    periods = {name: {} for name in ("dailyStatistics", "weeklyStatistics", "monthlyStatistics")}
+    client, session = make_client(200, periods)
+    assert await client.async_period_statistics(VIN) == (PeriodStatistics(None, None, None),) * 3
+    args, kwargs = session.get.call_args
+    assert args[0].endswith(f"/api/v5/{VIN}/statistics/all")
+    assert kwargs["params"] is None
 
 
 @pytest.mark.asyncio
