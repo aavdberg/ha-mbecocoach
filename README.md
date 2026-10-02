@@ -1,10 +1,10 @@
 # Mercedes Eco Coach for Home Assistant
 
-Experimental Home Assistant 2026.9 custom integration. Not affiliated with Mercedes-Benz. Development lives on `dev`; `main` is not released.
+Experimental Home Assistant 2026.9 custom integration. Not affiliated with Mercedes-Benz. Published code lives on `main`; ongoing development lives on `dev`.
 
 ## Install and test
 
-Copy `custom_components/mbecocoach` from the **`dev` branch** to your Home Assistant `config/custom_components` folder and restart Home Assistant. The test Home Assistant already has the development version installed. Select **Mercedes Eco Coach** under **Settings → Devices & services → Add integration**.
+Copy `custom_components/mbecocoach` from the **`main` branch** to your Home Assistant `config/custom_components` folder and restart Home Assistant. The test Home Assistant already has the development version installed. Select **Mercedes Eco Coach** under **Settings → Devices & services → Add integration**.
 
 Enter your 17-character VIN and **leave the optional bearer token blank** to try browser-assisted Mercedes login:
 
