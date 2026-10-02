@@ -50,6 +50,9 @@ def test_personal_points_are_not_lifetime_points() -> None:
     """Read only the aggregate from the captured personal statistics response."""
     payload = {"topCards": [card("DRIVING", "PERCENT", 91)], "pointsSummary": {"sum": {"points": 1200}}}
     assert parse_statistics(payload).points == 1200.0
+    assert parse_statistics({"topCards": [], "pointsSummary": {"sum": {"points": 0}}}) == PersonalStatistics(
+        None, None, None, 0.0
+    )
 
 
 @pytest.mark.parametrize(
