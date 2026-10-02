@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from urllib.parse import parse_qs, urljoin, urlsplit
 
@@ -14,6 +15,7 @@ from .api import EcoCoachAuthError, EcoCoachConnectionError, EcoCoachError
 from .oauth import AUTH_URL, OAuthAttempt, TokenSet, exchange_code
 
 _ORIGIN = "https://id.mercedes-benz.com"
+_LOGGER = logging.getLogger(__name__)
 _HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Origin": _ORIGIN,
@@ -57,8 +59,10 @@ async def _post_json(session: ClientSession, path: str, payload: dict[str, str |
         f"{_ORIGIN}{path}", json=payload, headers=_HEADERS, allow_redirects=False, timeout=15
     ) as response:
         if response.status in (400, 401, 403):
+            _LOGGER.warning("Eco Coach direct login password step rejected (HTTP %d)", response.status)
             raise EcoCoachAuthError("Mercedes rejected this login step")
         if response.status != 200:
+            _LOGGER.warning("Eco Coach direct login password step failed (HTTP %d)", response.status)
             raise EcoCoachError(f"Mercedes login returned HTTP {response.status}")
         try:
             data = await response.json()
@@ -73,8 +77,13 @@ async def _login(session: ClientSession, username: str, password: str) -> TokenS
     attempt = OAuthAttempt()
     async with session.get(attempt.url, headers=_HEADERS, timeout=15) as response:
         if response.status != 200:
+            _LOGGER.warning("Eco Coach direct login authorization failed (HTTP %d)", response.status)
             raise EcoCoachError(f"Mercedes authorization returned HTTP {response.status}")
-        resume = _resume_path(str(response.url))
+        try:
+            resume = _resume_path(str(response.url))
+        except EcoCoachAuthError:
+            _LOGGER.warning("Eco Coach direct login authorization continuation is invalid")
+            raise
 
     async with session.post(
         f"{_ORIGIN}/ciam/auth/ua",
@@ -84,6 +93,7 @@ async def _login(session: ClientSession, username: str, password: str) -> TokenS
         timeout=15,
     ) as response:
         if not 200 <= response.status < 300:
+            _LOGGER.warning("Eco Coach direct login browser setup failed (HTTP %d)", response.status)
             raise EcoCoachError(f"Mercedes browser setup returned HTTP {response.status}")
     async with session.post(
         f"{_ORIGIN}/ciam/auth/login/user",
@@ -93,8 +103,10 @@ async def _login(session: ClientSession, username: str, password: str) -> TokenS
         timeout=15,
     ) as response:
         if response.status in (400, 401, 403):
+            _LOGGER.warning("Eco Coach direct login username step rejected (HTTP %d)", response.status)
             raise EcoCoachAuthError("Mercedes rejected the username")
         if not 200 <= response.status < 300:
+            _LOGGER.warning("Eco Coach direct login username step failed (HTTP %d)", response.status)
             raise EcoCoachError(f"Mercedes username step returned HTTP {response.status}")
     outcome = await _post_json(
         session,
@@ -102,8 +114,10 @@ async def _login(session: ClientSession, username: str, password: str) -> TokenS
         {"username": username, "password": password, "rememberMe": False, "rid": uuid.uuid4().hex},
     )
     if outcome.get("result") == "GOTO_LOGIN_OTP":
+        _LOGGER.warning("Eco Coach direct login requires MFA")
         raise EcoCoachMfaRequired("Mercedes requires MFA; use browser login")
     if outcome.get("result") != "RESUME2OIDCP" or not isinstance(outcome.get("token"), str) or not outcome["token"]:
+        _LOGGER.warning("Eco Coach direct login returned an unsupported password-step result")
         raise EcoCoachUnsupportedLogin("Mercedes login requires an unsupported additional step")
 
     async with session.post(
@@ -114,9 +128,14 @@ async def _login(session: ClientSession, username: str, password: str) -> TokenS
         timeout=15,
     ) as response:
         if response.status not in (301, 302, 303):
+            _LOGGER.warning("Eco Coach direct login authorization resume failed (HTTP %d)", response.status)
             raise EcoCoachAuthError("Mercedes did not finish the authorization")
         callback = response.headers.get("Location", "")
-    return await exchange_code(session, attempt, callback)
+    try:
+        return await exchange_code(session, attempt, callback)
+    except EcoCoachError:
+        _LOGGER.warning("Eco Coach direct login code exchange failed")
+        raise
 
 
 async def async_direct_login(hass: HomeAssistant, username: str, password: str) -> TokenSet:
@@ -130,4 +149,4 @@ async def async_direct_login(hass: HomeAssistant, username: str, password: str) 
         except (TimeoutError, ClientError) as err:
             raise EcoCoachConnectionError("Mercedes login is unreachable") from err
     finally:
-        await session.close()
+        session.detach()

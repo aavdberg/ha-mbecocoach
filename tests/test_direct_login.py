@@ -11,6 +11,7 @@ from custom_components.mbecocoach.direct_login import (
     EcoCoachMfaRequired,
     EcoCoachUnsupportedLogin,
     _login,
+    _post_json,
     _resume_path,
     async_direct_login,
 )
@@ -107,9 +108,8 @@ async def test_unsupported_login_step_stops_before_code_exchange() -> None:
 
 @pytest.mark.asyncio
 async def test_isolated_cookie_session_always_closes() -> None:
-    """Do not leak password-era session cookies into the HA API session."""
+    """Detach the cookie session without closing Home Assistant's shared connector."""
     session = MagicMock()
-    session.close = AsyncMock()
     with (
         patch("custom_components.mbecocoach.direct_login.async_create_clientsession", return_value=session) as create,
         patch("custom_components.mbecocoach.direct_login._login", new_callable=AsyncMock) as login,
@@ -119,4 +119,19 @@ async def test_isolated_cookie_session_always_closes() -> None:
             await async_direct_login(MagicMock(), "example", "password")
     assert create.call_args.kwargs["auto_cleanup"] is False
     login.assert_awaited_once()
-    session.close.assert_awaited_once()
+    session.detach.assert_called_once_with()
+    session.close.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_rejected_password_logs_only_stage_and_status(caplog: pytest.LogCaptureFixture) -> None:
+    """A failed private login must never send credentials to the HA log."""
+    session = MagicMock()
+    session.post.return_value = reply(401)
+    with pytest.raises(EcoCoachAuthError):
+        await _post_json(
+            session, "/ciam/auth/login/pass", {"username": "private@example.invalid", "password": "secret-value"}
+        )
+    assert "password step rejected (HTTP 401)" in caplog.text
+    assert "private@example.invalid" not in caplog.text
+    assert "secret-value" not in caplog.text

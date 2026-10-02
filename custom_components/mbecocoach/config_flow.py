@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -26,6 +27,7 @@ VIN_PATTERN = re.compile(r"[A-HJ-NPR-Z0-9]{17}\Z")
 TOKEN_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
 URL_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.URL))
 LOGIN_MODE_SELECTOR = SelectSelector(SelectSelectorConfig(options=["browser", "direct"], translation_key="login_mode"))
+_LOGGER = logging.getLogger(__name__)
 
 
 class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -107,7 +109,11 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 try:
                     tokens = await async_direct_login(self.hass, username, password)
-                    await self._verify(self._vin, tokens.access_token)
+                    try:
+                        await self._verify(self._vin, tokens.access_token)
+                    except EcoCoachError:
+                        _LOGGER.warning("Eco Coach direct login statistics verification failed")
+                        raise
                 except EcoCoachMfaRequired:
                     errors["base"] = "mfa_required"
                 except EcoCoachUnsupportedLogin:
