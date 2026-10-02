@@ -3,8 +3,13 @@
     "step": {
       "user": {
         "title": "Mercedes Eco Coach",
-        "description": "Enter your VIN. Leave the token blank to sign in via Mercedes in a desktop browser. Alternatively enter an existing access token.",
+        "description": "Enter your VIN. Choose browser login (confirmed) or experimental direct login (no callback copying). An existing access token can also be entered.",
         "data": {"vin": "Vehicle identification number (VIN)", "token": "Bearer token"}
+      },
+      "direct": {
+        "title": "Experimental direct Mercedes login",
+        "description": "Enter your Mercedes account credentials for one login attempt. Home Assistant sends the password to Mercedes but does NOT store it in the config entry. MFA and additional confirmation screens are not supported; cancel and use browser login if needed.",
+        "data": {"username": "Mercedes account email or phone number", "password": "Password"}
       },
       "callback": {
         "title": "Complete Mercedes sign-in",
@@ -13,7 +18,7 @@
       },
       "reauth_confirm": {
         "title": "Renew Eco Coach token",
-        "description": "Leave the token empty to start a new browser login, or enter a replacement bearer token.",
+        "description": "Leave the token empty to start another login, select experimental direct login, or enter a replacement bearer token.",
         "data": {"token": "Bearer token"}
       }
     },
@@ -21,6 +26,7 @@
       "invalid_vin": "Enter a valid 17-character VIN.",
       "invalid_token": "Enter a non-empty token.",
       "invalid_auth": "Mercedes rejected the authorization, or the callback was invalid or expired. Start a new login if needed.",
+      "mfa_required": "Mercedes requires MFA. Cancel and use browser login instead.",
       "cannot_connect": "The Mercedes login or Eco Coach statistics server could not be reached.",
       "invalid_response": "The login or statistics server returned an unsupported response."
     },

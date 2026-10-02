@@ -10,6 +10,7 @@ import voluptuous as vol
 from custom_components.mbecocoach.api import EcoCoachAuthError
 from custom_components.mbecocoach.config_flow import EcoCoachConfigFlow
 from custom_components.mbecocoach.const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, CONF_VIN
+from custom_components.mbecocoach.direct_login import EcoCoachMfaRequired
 from custom_components.mbecocoach.oauth import TokenSet
 
 VIN = "WDD12345678901234"
@@ -159,3 +160,46 @@ async def test_reauth_browser_login_updates_existing_entry() -> None:
         CONF_REFRESH_TOKEN: "rotated",
         CONF_EXPIRES_AT: 10000,
     }
+
+
+@pytest.mark.asyncio
+async def test_direct_login_creates_entry_without_password() -> None:
+    """Never persist either credential, while preserving the existing browser choice."""
+    flow = EcoCoachConfigFlow()
+    flow.hass = MagicMock()
+    flow.async_set_unique_id = AsyncMock()
+    flow._abort_if_unique_id_configured = MagicMock()
+    flow.async_show_form = MagicMock(return_value={"type": "form"})
+    flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
+    result = await flow.async_step_user({CONF_VIN: VIN, "login_mode": "direct"})
+    assert result["type"] == "form"
+    with (
+        patch("custom_components.mbecocoach.config_flow.async_direct_login", new_callable=AsyncMock) as login,
+        patch.object(flow, "_verify", new_callable=AsyncMock) as verify,
+    ):
+        login.return_value = TokenSet("access", "refresh", 10000)
+        result = await flow.async_step_direct({"username": " user@example.invalid ", "password": "passphrase"})
+    assert result["type"] == "create_entry"
+    login.assert_awaited_once_with(flow.hass, "user@example.invalid", "passphrase")
+    verify.assert_awaited_once_with(VIN, "access")
+    assert flow.async_create_entry.call_args.kwargs["data"] == {
+        CONF_VIN: VIN,
+        CONF_TOKEN: "access",
+        CONF_REFRESH_TOKEN: "refresh",
+        CONF_EXPIRES_AT: 10000,
+    }
+
+
+@pytest.mark.asyncio
+async def test_direct_login_mfa_keeps_entry_unmodified() -> None:
+    """Show an actionable error and retain existing credentials on MFA."""
+    flow = EcoCoachConfigFlow()
+    flow.hass = MagicMock()
+    flow._reauth_entry = MagicMock(data={CONF_VIN: VIN, CONF_TOKEN: "old"})
+    flow.async_show_form = MagicMock(return_value={"type": "form"})
+    await flow.async_step_reauth_confirm({"login_mode": "direct"})
+    with patch("custom_components.mbecocoach.config_flow.async_direct_login", new_callable=AsyncMock) as login:
+        login.side_effect = EcoCoachMfaRequired("MFA")
+        await flow.async_step_direct({"username": "user", "password": "passphrase"})
+    assert flow.async_show_form.call_args.kwargs["errors"]["base"] == "mfa_required"
+    assert flow._reauth_entry.data[CONF_TOKEN] == "old"
