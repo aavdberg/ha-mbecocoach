@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from urllib.parse import parse_qs, urljoin, urlsplit
 
@@ -16,6 +17,7 @@ from .oauth import AUTH_URL, OAuthAttempt, TokenSet, exchange_code
 
 _ORIGIN = "https://id.mercedes-benz.com"
 _LOGGER = logging.getLogger(__name__)
+_RESUME_PATH = re.compile(r"/as/[A-Za-z0-9_-]+/resume/as/authorization\.ping\Z")
 _HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Origin": _ORIGIN,
@@ -44,11 +46,11 @@ def _resume_path(final_url: str) -> str:
     if len(resume) != 1 or not resume[0].startswith("/") or resume[0].startswith("//"):
         raise EcoCoachAuthError("Mercedes did not provide an authorization continuation")
     target = urlsplit(urljoin(_ORIGIN, resume[0]))
-    if (target.scheme, target.netloc, target.path) != (
-        "https",
-        "id.mercedes-benz.com",
-        "/as/authorization.oauth2",
-    ) or target.fragment:
+    if (
+        (target.scheme, target.netloc) != ("https", "id.mercedes-benz.com")
+        or not _RESUME_PATH.fullmatch(target.path)
+        or target.fragment
+    ):
         raise EcoCoachAuthError("Invalid Mercedes authorization continuation")
     return resume[0]
 
