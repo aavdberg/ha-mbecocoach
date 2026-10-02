@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import voluptuous as vol
+from homeassistant.components.frontend import add_extra_js_url, remove_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -16,6 +19,10 @@ from .coordinator import EcoCoachCoordinator
 
 type EcoCoachConfigEntry = ConfigEntry[EcoCoachCoordinator]
 
+_CARD_PATH = "/mbecocoach/mbecocoach-card.js"
+_CARD_URL = f"{_CARD_PATH}?v=0.7.0"
+_CARD_REGISTERED = f"{DOMAIN}_card_registered"
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> bool:
     """Set up statistics for a configured VIN."""
@@ -26,6 +33,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "event", "button"])
     loaded_entries: set[str] = hass.data.setdefault(DOMAIN, set())
+    if not hass.data.get(_CARD_REGISTERED):
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(_CARD_PATH, str(Path(__file__).parent / "frontend" / "mbecocoach-card.js"))]
+        )
+        hass.data[_CARD_REGISTERED] = True
+    if not loaded_entries:
+        add_extra_js_url(hass, _CARD_URL)
     loaded_entries.add(entry.entry_id)
     if not hass.services.has_service(DOMAIN, "get_points_history"):
 
@@ -60,6 +74,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) ->
         loaded_entries: set[str] = hass.data[DOMAIN]
         loaded_entries.discard(entry.entry_id)
         if not loaded_entries:
+            remove_extra_js_url(hass, _CARD_URL)
             hass.services.async_remove(DOMAIN, "get_points_history")
             hass.data.pop(DOMAIN)
     return unloaded

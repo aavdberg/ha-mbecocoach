@@ -237,9 +237,12 @@ async def test_unload_removes_history_service_only_after_last_loaded_entry() -> 
     hass = MagicMock()
     hass.data = {DOMAIN: {"first", "second"}}
     hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
-    await async_unload_entry(hass, MagicMock(entry_id="first"))
-    assert hass.data[DOMAIN] == {"second"}
-    hass.services.async_remove.assert_not_called()
-    await async_unload_entry(hass, MagicMock(entry_id="second"))
+    with patch("custom_components.mbecocoach.remove_extra_js_url") as remove_js:
+        await async_unload_entry(hass, MagicMock(entry_id="first"))
+        assert hass.data[DOMAIN] == {"second"}
+        hass.services.async_remove.assert_not_called()
+        remove_js.assert_not_called()
+        await async_unload_entry(hass, MagicMock(entry_id="second"))
+        remove_js.assert_called_once()
     hass.services.async_remove.assert_called_once_with(DOMAIN, "get_points_history")
     assert DOMAIN not in hass.data
