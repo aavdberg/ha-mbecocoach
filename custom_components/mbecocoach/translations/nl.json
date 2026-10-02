@@ -34,6 +34,7 @@
       "drive_score": {"name": "Rijscore"},
       "avg_consumption": {"name": "Gemiddeld verbruik"},
       "saved_emissions": {"name": "Bespaarde uitstoot"},
+      "personal_points": {"name": "Persoonlijke periodepunten"},
       "daily_drive_score": {"name": "Dagelijkse rijscore"},
       "daily_consumption": {"name": "Dagelijks stroomverbruik"},
       "daily_points": {"name": "Dagelijkse punten"},

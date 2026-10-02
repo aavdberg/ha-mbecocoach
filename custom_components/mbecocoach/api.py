@@ -35,6 +35,7 @@ class PersonalStatistics:
     drive_score: float | None
     avg_consumption: float | None
     saved_emissions: float | None
+    points: float | None = None
 
 
 @dataclass(frozen=True)
@@ -96,9 +97,17 @@ def parse_statistics(payload: Any) -> PersonalStatistics:
             raise EcoCoachError(f"Personal statistics contains duplicate {field} cards")
         value = quantity.get("value")
         values[field] = _number(value, field)
-    if not values:
+    summary = payload.get("pointsSummary")
+    points = None
+    if summary is not None:
+        if not isinstance(summary, dict) or not isinstance(summary.get("sum"), dict):
+            raise EcoCoachError("Personal statistics contains an invalid points summary")
+        points = _number(summary["sum"].get("points"), "personal.points")
+    if not values and points is None:
         raise EcoCoachError("Personal statistics response contains no supported metrics")
-    return PersonalStatistics(values.get("drive_score"), values.get("avg_consumption"), values.get("saved_emissions"))
+    return PersonalStatistics(
+        values.get("drive_score"), values.get("avg_consumption"), values.get("saved_emissions"), points
+    )
 
 
 def parse_period_statistics(payload: Any) -> tuple[PeriodStatistics, PeriodStatistics, PeriodStatistics]:

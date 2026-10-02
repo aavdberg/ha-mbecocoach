@@ -30,6 +30,11 @@ SENSORS = (
         icon="mdi:leaf",
         native_unit_of_measurement="kg",
     ),
+    SensorEntityDescription(
+        key="personal_points",
+        translation_key="personal_points",
+        icon="mdi:star-circle",
+    ),
 )
 
 PERIOD_SENSORS = tuple(

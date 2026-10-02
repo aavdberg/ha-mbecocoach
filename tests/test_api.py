@@ -42,8 +42,17 @@ def test_parse_statistics() -> None:
             "bottomCards": [],
             "pointsSummary": {"sum": {"points": 2675}},
         }
-    ) == PersonalStatistics(91.047, 19.503, 5.1285)
+    ) == PersonalStatistics(91.047, 19.503, 5.1285, 2675.0)
     assert parse_statistics({"topCards": [card("DRIVING", "PERCENT", 76)]}) == PersonalStatistics(76.0, None, None)
+
+
+def test_personal_points_are_not_lifetime_points() -> None:
+    """Read only the aggregate from the captured personal statistics response."""
+    payload = {"topCards": [card("DRIVING", "PERCENT", 91)], "pointsSummary": {"sum": {"points": 1200}}}
+    assert parse_statistics(payload).points == 1200.0
+    assert parse_statistics({"topCards": [], "pointsSummary": {"sum": {"points": 0}}}) == PersonalStatistics(
+        None, None, None, 0.0
+    )
 
 
 @pytest.mark.parametrize(
@@ -59,6 +68,8 @@ def test_parse_statistics() -> None:
         {"topCards": [card("DRIVING", "PERCENT", float("nan"))]},
         {"topCards": [card("DRIVING", "PERCENT", 50), card("DRIVING", "PERCENT", 51)]},
         {"topCards": [card("DRIVING", "KM", 50)]},
+        {"topCards": [card("DRIVING", "PERCENT", 50)], "pointsSummary": []},
+        {"topCards": [card("DRIVING", "PERCENT", 50)], "pointsSummary": {"sum": {"points": True}}},
     ],
 )
 def test_parse_statistics_rejects_unsupported_payload(payload: object) -> None:
