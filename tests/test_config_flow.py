@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import voluptuous as vol
 
-from custom_components.mbecocoach.api import EcoCoachAuthError
+from custom_components.mbecocoach.api import EcoCoachAuthError, EcoCoachError
 from custom_components.mbecocoach.config_flow import EcoCoachConfigFlow
 from custom_components.mbecocoach.const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, CONF_VIN
 from custom_components.mbecocoach.direct_login import EcoCoachMfaRequired, EcoCoachUnsupportedLogin
@@ -216,3 +216,55 @@ async def test_direct_login_unsupported_step_has_distinct_error() -> None:
         login.side_effect = EcoCoachUnsupportedLogin("unsupported step")
         await flow.async_step_direct({"username": "user", "password": "passphrase"})
     assert flow.async_show_form.call_args.kwargs["errors"] == {"base": "unsupported_login"}
+
+
+@pytest.mark.asyncio
+async def test_direct_login_statistics_failure_is_not_reported_as_password_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A token exchange can succeed even if vehicle statistics cannot be parsed."""
+    flow = EcoCoachConfigFlow()
+    flow.hass = MagicMock()
+    flow._vin = VIN
+    flow.async_show_form = MagicMock(return_value={"type": "form"})
+    flow.async_create_entry = MagicMock()
+    with (
+        patch("custom_components.mbecocoach.config_flow.async_direct_login", new_callable=AsyncMock) as login,
+        patch.object(flow, "_verify", new_callable=AsyncMock) as verify,
+    ):
+        login.return_value = TokenSet("private-access-token", "private-refresh-token", 10000)
+        verify.side_effect = EcoCoachError("Unsupported statistics")
+        await flow.async_step_direct({"username": "private@example.invalid", "password": "private-password"})
+    assert flow.async_show_form.call_args.kwargs["errors"] == {"base": "statistics_verification_failed"}
+    flow.async_create_entry.assert_not_called()
+    assert "private-access-token" not in caplog.text
+    assert "private-password" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failing_step", ["personal", "period"])
+async def test_statistics_verification_logs_only_failing_step(
+    failing_step: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Avoid putting the VIN or bearer token in a diagnostic warning."""
+    flow = EcoCoachConfigFlow()
+    flow.hass = MagicMock()
+    flow.hass.config.time_zone = "Europe/Amsterdam"
+    with (
+        patch("custom_components.mbecocoach.config_flow.async_get_clientsession"),
+        patch("custom_components.mbecocoach.config_flow.EcoCoachClient") as client,
+    ):
+        client.return_value.async_personal_statistics = AsyncMock()
+        client.return_value.async_period_statistics = AsyncMock()
+        method = (
+            client.return_value.async_personal_statistics
+            if failing_step == "personal"
+            else client.return_value.async_period_statistics
+        )
+        method.side_effect = EcoCoachError("a response body must not be logged")
+        with pytest.raises(EcoCoachError):
+            await flow._verify(VIN, "private-access-token")
+    assert f"Eco Coach {failing_step} statistics verification failed (EcoCoachError)" in caplog.text
+    assert VIN not in caplog.text
+    assert "private-access-token" not in caplog.text
+    assert "a response body must not be logged" not in caplog.text

@@ -30,6 +30,10 @@ LOGIN_MODE_SELECTOR = SelectSelector(SelectSelectorConfig(options=["browser", "d
 _LOGGER = logging.getLogger(__name__)
 
 
+class EcoCoachStatisticsVerificationError(EcoCoachError):
+    """An OAuth login succeeded, but Eco Coach statistics could not be verified."""
+
+
 class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Authorize Eco Coach in a browser or isolated CIAM session, or use a token."""
 
@@ -78,8 +82,16 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _verify(self, vin: str, token: str) -> None:
         client = EcoCoachClient(async_get_clientsession(self.hass), token, ZoneInfo(self.hass.config.time_zone))
-        await client.async_personal_statistics(vin)
-        await client.async_period_statistics(vin)
+        try:
+            await client.async_personal_statistics(vin)
+        except EcoCoachError as err:
+            _LOGGER.warning("Eco Coach personal statistics verification failed (%s)", type(err).__name__)
+            raise
+        try:
+            await client.async_period_statistics(vin)
+        except EcoCoachError as err:
+            _LOGGER.warning("Eco Coach period statistics verification failed (%s)", type(err).__name__)
+            raise
 
     async def async_step_authorize(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
         """Offer a PKCE URL for a desktop browser; the callback stays in this flow."""
@@ -111,9 +123,10 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     tokens = await async_direct_login(self.hass, username, password)
                     try:
                         await self._verify(self._vin, tokens.access_token)
-                    except EcoCoachError:
-                        _LOGGER.warning("Eco Coach direct login statistics verification failed")
-                        raise
+                    except EcoCoachError as err:
+                        raise EcoCoachStatisticsVerificationError from err
+                except EcoCoachStatisticsVerificationError:
+                    errors["base"] = "statistics_verification_failed"
                 except EcoCoachMfaRequired:
                     errors["base"] = "mfa_required"
                 except EcoCoachUnsupportedLogin:

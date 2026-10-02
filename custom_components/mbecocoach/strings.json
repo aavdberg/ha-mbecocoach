@@ -27,6 +27,7 @@
       "invalid_token": "Enter a non-empty token.",
       "invalid_auth": "Mercedes rejected the authorization, or the callback was invalid or expired. Start a new login if needed.",
       "unsupported_login": "Mercedes requires an additional or changed login step. Cancel and use browser login instead.",
+      "statistics_verification_failed": "Mercedes login completed, but Eco Coach could not verify this vehicle's statistics. Do not retry your password; check the Home Assistant log for the failing statistics step.",
       "mfa_required": "Mercedes requires MFA. Cancel and use browser login instead.",
       "cannot_connect": "The Mercedes login or Eco Coach statistics server could not be reached.",
       "invalid_response": "The login or statistics server returned an unsupported response."

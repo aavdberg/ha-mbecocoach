@@ -27,6 +27,7 @@
       "invalid_token": "Voer een token in.",
       "invalid_auth": "Mercedes wees de aanmelding af of de terugkeer-URL is ongeldig of verlopen. Start indien nodig een nieuwe aanmelding.",
       "unsupported_login": "Mercedes vereist een extra of gewijzigde aanmeldstap. Annuleer en gebruik de browseraanmelding.",
+      "statistics_verification_failed": "Aanmelden bij Mercedes is gelukt, maar Eco Coach kon de voertuigstatistieken niet verifiëren. Probeer je wachtwoord niet opnieuw; controleer in de Home Assistant-log welke statistiekstap faalde.",
       "mfa_required": "Mercedes vereist MFA. Annuleer en gebruik de browseraanmelding.",
       "cannot_connect": "De Mercedes-aanmelding of Eco Coach-statistiekserver is niet bereikbaar.",
       "invalid_response": "De aanmeld- of statistiekserver gaf een onbekend antwoord."

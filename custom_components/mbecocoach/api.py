@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, tzinfo
@@ -10,6 +11,8 @@ from typing import Any
 from aiohttp import ClientError, ClientSession
 
 from .const import BASE_URL
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class EcoCoachError(Exception):
@@ -201,10 +204,13 @@ class EcoCoachClient:
                 timeout=15,
             ) as response:
                 if response.status in (401, 403):
+                    _LOGGER.warning("Eco Coach statistics authorization failed (HTTP %d)", response.status)
                     raise EcoCoachAuthError("Eco Coach rejected the token")
                 if response.status == 429:
+                    _LOGGER.warning("Eco Coach statistics request rate limited (HTTP 429)")
                     raise EcoCoachRateLimitError("Eco Coach rate limit reached")
                 if response.status != 200:
+                    _LOGGER.warning("Eco Coach statistics request failed (HTTP %d)", response.status)
                     raise EcoCoachError(f"Statistics request failed (HTTP {response.status})")
                 try:
                     payload = await response.json()

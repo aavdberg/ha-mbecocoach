@@ -182,11 +182,14 @@ async def test_period_request_has_no_query_parameters() -> None:
     ("status", "error"),
     [(401, EcoCoachAuthError), (403, EcoCoachAuthError), (429, EcoCoachRateLimitError), (500, EcoCoachError)],
 )
-async def test_http_errors(status: int, error: type[Exception]) -> None:
+async def test_http_errors(status: int, error: type[Exception], caplog: pytest.LogCaptureFixture) -> None:
     """Authentication, throttling, and server errors remain distinguishable."""
     client, _ = make_client(status)
     with pytest.raises(error):
         await client.async_personal_statistics(VIN)
+    assert f"HTTP {status}" in caplog.text
+    assert VIN not in caplog.text
+    assert "sample-token" not in caplog.text
 
 
 @pytest.mark.asyncio
