@@ -53,7 +53,8 @@ const TEXT = {
     invalidEntity: "Select an Eco Coach Total account points sensor.",
     registryError: "Eco Coach entities could not be discovered. Check the card configuration and try again.",
     historyError: "Points history could not be loaded. Try again.",
-    refreshError: "Refresh failed. Check that the Eco Coach history button is available, then try again.",
+    refreshUnavailable: "Re-import is unavailable. Check that the Eco Coach history button is enabled.",
+    refreshFailed: "Re-import failed. Cached awards are unchanged; check the Eco Coach connection and try later.",
     refreshing: "Re-importing…",
     driving: "Driving",
     charging: "Charging",
@@ -94,7 +95,8 @@ const TEXT = {
     invalidEntity: "Selecteer een Eco Coach-sensor voor het totaal aantal accountpunten.",
     registryError: "Eco Coach-entiteiten konden niet worden gevonden. Controleer de kaartinstellingen en probeer opnieuw.",
     historyError: "Puntenoverzicht kon niet worden geladen. Probeer het later opnieuw.",
-    refreshError: "Herimport mislukt. Controleer of de Eco Coach-knop voor punten beschikbaar is.",
+    refreshUnavailable: "Herimport is niet beschikbaar. Controleer of de Eco Coach-geschiedenisknop is ingeschakeld.",
+    refreshFailed: "Herimport mislukt. Opgeslagen punten zijn ongewijzigd; controleer de verbinding met Eco Coach en probeer het later opnieuw.",
     refreshing: "Opnieuw importeren…",
     driving: "Rijden",
     charging: "Laden",
@@ -152,7 +154,7 @@ const STYLE = `
   h3 { margin: 0 0 12px; font-size: 1rem; font-weight: 650; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 135px), 1fr)); gap: 10px; }
   .tile {
-    min-width: 0; padding: 14px; border-radius: 13px;
+    min-width: 0; padding: 14px; border: 0; border-radius: 13px;
     background: var(--secondary-background-color);
   }
   .tile-label { color: var(--secondary-text-color); font-size: .82rem; }
@@ -373,6 +375,7 @@ class EcoCoachCard extends HTMLElement {
     this._history = { total: 0, offset: 0, awards: [] };
     this._historyOffset = 0;
     this._lastHistoryFetch = 0;
+    this._refreshError = false;
     this._pendingFocusKey = null;
   }
 
@@ -446,7 +449,6 @@ class EcoCoachCard extends HTMLElement {
     } catch (_error) {
       if (requestId !== this._historyRequestId) return;
       this._historyError = true;
-      this._refreshError = this._refreshing;
     } finally {
       if (requestId === this._historyRequestId) {
         this._historyLoading = false;
@@ -464,14 +466,18 @@ class EcoCoachCard extends HTMLElement {
       if (!this._entryId || !this._related.refresh_points_history) {
         await this._loadRegistry(true);
       }
-      if (!this._entryId || !this._related.refresh_points_history) throw new Error("History button unavailable");
+      const buttonId = this._related.refresh_points_history;
+      const button = this._state(buttonId);
+      if (!this._entryId || !button || button.state === "unavailable") {
+        this._refreshError = "unavailable";
+        return;
+      }
       await this._hass.callService("button", "press", {
-        entity_id: this._related.refresh_points_history,
-      });
+        entity_id: buttonId,
+      }, undefined, false);
       await this._fetchHistory(true);
     } catch (_error) {
-      this._historyError = true;
-      this._refreshError = true;
+      this._refreshError = "failed";
     } finally {
       this._refreshing = false;
       this._render();
@@ -658,17 +664,19 @@ class EcoCoachCard extends HTMLElement {
     const historySection = this._section(content, labels.history);
     historySection.id = "eco-coach-history";
     historySection.querySelector("h3").tabIndex = -1;
+    if (this._refreshError) {
+      this._appendMessage(historySection, labels[this._refreshError === "unavailable"
+        ? "refreshUnavailable" : "refreshFailed"], true);
+    }
     if (this._historyError) {
-      this._appendMessage(historySection, this._refreshError ? labels.refreshError : labels.historyError, true);
-      if (!this._refreshError) {
-        const retry = document.createElement("button");
-        retry.type = "button";
-        retry.className = "refresh";
-        retry.textContent = labels.retry;
-        retry.dataset.focusKey = "retry";
-        retry.addEventListener("click", () => this._fetchHistory());
-        historySection.append(retry);
-      }
+      this._appendMessage(historySection, labels.historyError, true);
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "refresh";
+      retry.textContent = labels.retry;
+      retry.dataset.focusKey = "retry";
+      retry.addEventListener("click", () => this._fetchHistory());
+      historySection.append(retry);
     }
     else if (this._historyLoading) this._appendMessage(historySection, labels.loading);
     else if (this._history.awards.length === 0 && this._historyOffset === 0) this._appendMessage(historySection, labels.noAwards);

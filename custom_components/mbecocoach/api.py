@@ -281,10 +281,17 @@ class EcoCoachClient:
             if all_history
             else (datetime.now(UTC) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
         )
-        payload = await self._async_get(f"{BASE_URL}/api/v5/{vin}/report", "report", {"from": start})
+        payload = await self._async_get(
+            f"{BASE_URL}/api/v5/{vin}/report",
+            "report",
+            {"from": start},
+            timeout=90 if all_history else 15,
+        )
         return parse_awards(payload)
 
-    async def _async_get(self, url: str, endpoint: str, params: dict[str, str] | None = None) -> Any:
+    async def _async_get(
+        self, url: str, endpoint: str, params: dict[str, str] | None = None, *, timeout: int = 15
+    ) -> Any:
         """Request an Eco Coach endpoint and handle documented HTTP failures."""
         try:
             async with self._session.get(
@@ -295,7 +302,7 @@ class EcoCoachClient:
                     "ecocoach-platform": "iOS",
                 },
                 params=params,
-                timeout=15,
+                timeout=timeout,
             ) as response:
                 _LOGGER.debug("Eco Coach statistics %s response HTTP %d", endpoint, response.status)
                 if response.status in (401, 403):
