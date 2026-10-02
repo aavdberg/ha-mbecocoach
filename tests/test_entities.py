@@ -19,6 +19,7 @@ VIN = "WDD12345678901234"
         ("personal_drive_score", 91.0),
         ("personal_avg_consumption", 19.5),
         ("personal_saved_emissions", 5.1),
+        ("personal_points", 1200.0),
         ("daily_drive_score", 76.0),
         ("daily_consumption", 22.0),
         ("daily_points", 2675.0),
@@ -34,7 +35,7 @@ def test_sensor_value_and_identity(key: str, expected: float) -> None:
     """Expose correct period values while keeping original personal entity IDs."""
     coordinator = MagicMock()
     coordinator.data = EcoCoachData(
-        PersonalStatistics(91.0, 19.5, 5.1),
+        PersonalStatistics(91.0, 19.5, 5.1, 1200.0),
         PeriodStatistics(76.0, 22.0, 2675.0),
         PeriodStatistics(79.0, 21.5, 15375.0),
         PeriodStatistics(87.0, 19.9, 82850.0),

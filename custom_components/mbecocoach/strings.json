@@ -34,6 +34,7 @@
       "drive_score": {"name": "Drive score"},
       "avg_consumption": {"name": "Average consumption"},
       "saved_emissions": {"name": "Saved emissions"},
+      "personal_points": {"name": "Personal period points"},
       "daily_drive_score": {"name": "Daily drive score"},
       "daily_consumption": {"name": "Daily electric consumption"},
       "daily_points": {"name": "Daily points"},
