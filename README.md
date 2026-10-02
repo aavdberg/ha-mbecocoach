@@ -8,7 +8,7 @@ Copy `custom_components/mbecocoach` from the **`dev` branch** to your Home Assis
 
 Enter your 17-character VIN and **leave the optional bearer token blank** to try browser-assisted Mercedes login:
 
-1. Copy the authorization URL displayed by Home Assistant into a **desktop browser without the Eco Coach mobile app installed**. Do not use your iPhone for this step.
+1. Copy the **prefilled authorization URL field above `callback_url`** into a **desktop browser without the Eco Coach mobile app installed**. Home Assistant does not open the browser automatically. Do not use your iPhone for this step.
 2. Sign in to Mercedes Identity in that browser. The registered `ecocoach://login/callback` link may produce a browser error because no desktop app handles it. Copy the **complete callback URL**, including query parameters, from the address bar or browser history.
 3. Within ten minutes, paste it into the Home Assistant form. Never share this URL: it contains a short-lived one-time code. Home Assistant validates the PKCE state, exchanges the code and verifies the Eco Coach statistics endpoints before saving tokens.
 

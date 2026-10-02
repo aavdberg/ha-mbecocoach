@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import voluptuous as vol
 
 from custom_components.mbecocoach.api import EcoCoachAuthError
 from custom_components.mbecocoach.config_flow import EcoCoachConfigFlow
@@ -95,13 +96,18 @@ async def test_browser_login_creates_entry() -> None:
     flow.async_create_entry = MagicMock(return_value={"type": "create_entry"})
     assert (await flow.async_step_user({CONF_VIN: VIN}))["type"] == "form"
     assert "code_challenge=" in flow.async_show_form.call_args.kwargs["description_placeholders"]["authorization_url"]
+    schema = flow.async_show_form.call_args.kwargs["data_schema"]
+    defaults = {key.schema: key.default() for key in schema.schema if isinstance(key, vol.Optional)}
+    assert defaults["authorization_url"] == flow._attempt.url
     callback = f"ecocoach://login/callback?code=synthetic&state={flow._attempt.state}"
     with (
         patch("custom_components.mbecocoach.config_flow.exchange_code", new_callable=AsyncMock) as exchange,
         patch.object(flow, "_verify", new_callable=AsyncMock) as verify,
     ):
         exchange.return_value = TokenSet("access", "refresh", 10000)
-        result = await flow.async_step_callback({"callback_url": callback})
+        result = await flow.async_step_callback(
+            {"authorization_url": "https://example.invalid/", "callback_url": callback}
+        )
     assert result["type"] == "create_entry"
     verify.assert_awaited_once_with(VIN, "access")
     assert flow.async_create_entry.call_args.kwargs["data"] == {
