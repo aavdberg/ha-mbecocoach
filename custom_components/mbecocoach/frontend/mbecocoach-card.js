@@ -488,11 +488,14 @@ class EcoCoachCard extends HTMLElement {
     return String(this._hass?.language || "en").toLowerCase().startsWith("nl") ? "nl" : "en";
   }
 
-  _number(value, digits = 0) {
+  _number(value, digits = 0, minimumDigits = 0) {
     const number = Number(value);
     if (!Number.isFinite(number)) return "—";
     const locale = this._hass?.language || "en";
-    return new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(number);
+    return new Intl.NumberFormat(locale, {
+      minimumFractionDigits: minimumDigits,
+      maximumFractionDigits: digits,
+    }).format(number);
   }
 
   _state(entityId) {
@@ -640,7 +643,8 @@ class EcoCoachCard extends HTMLElement {
         const value = document.createElement("div");
         value.className = "tile-value";
         value.textContent = state && !["unknown", "unavailable"].includes(state.state)
-          ? this._number(state.state, 1) : "—";
+          ? this._number(state.state, suffix === "saved_emissions" ? 2 : 1, suffix === "saved_emissions" ? 2 : 0)
+          : "—";
         const unit = state?.attributes?.unit_of_measurement;
         if (unit) {
           const unitLabel = document.createElement("span");
@@ -734,7 +738,7 @@ class EcoCoachCard extends HTMLElement {
 
     card.append(content);
     this.shadowRoot.replaceChildren(style, card);
-    if (active && focusKey) {
+    if ((active || this._pendingFocusKey) && focusKey) {
       const controls = [...this.shadowRoot.querySelectorAll("[data-focus-key]")];
       const target = controls.find((control) => control.dataset.focusKey === focusKey && !control.disabled);
       if (target) {
@@ -745,6 +749,9 @@ class EcoCoachCard extends HTMLElement {
         const fallback = this._historyLoading ? null : controls.find((control) =>
           control.dataset.focusKey.startsWith("page:") && !control.disabled);
         (fallback || historySection.querySelector("h3")).focus();
+      } else if (focusKey === "reimport" && this._refreshing) {
+        this._pendingFocusKey = focusKey;
+        historySection.querySelector("h3").focus();
       } else {
         this._pendingFocusKey = null;
       }

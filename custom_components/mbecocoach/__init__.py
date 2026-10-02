@@ -21,7 +21,7 @@ from .coordinator import EcoCoachCoordinator
 type EcoCoachConfigEntry = ConfigEntry[EcoCoachCoordinator]
 
 _CARD_PATH = "/mbecocoach/mbecocoach-card.js"
-_CARD_URL = f"{_CARD_PATH}?v=0.7.2"
+_CARD_URL = f"{_CARD_PATH}?v=0.7.3"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:

@@ -136,8 +136,15 @@ def test_award_event_only_emits_new_ids() -> None:
         "occurred_at": new.occurred_at.isoformat(),
     }
     entity.async_write_ha_state.assert_called_once()
+    entity._trigger_event = MagicMock()
     entity._handle_coordinator_update()
     assert entity.async_write_ha_state.call_count == 2
+    coordinator.data.awards = ()
+    entity._handle_coordinator_update()
+    coordinator.data.awards = (new,)
+    entity._handle_coordinator_update()
+    assert entity.async_write_ha_state.call_count == 4
+    entity._trigger_event.assert_not_called()
 
 
 @pytest.mark.asyncio
