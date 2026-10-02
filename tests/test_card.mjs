@@ -20,7 +20,7 @@ const source = await readFile(
 );
 const cardModule = await import(
   `data:text/javascript;base64,${Buffer.from(
-    `${source}\nexport { getRelatedEntityRecords, normalizeHistoryResponse, METRICS };`,
+    `${source}\nexport { getRelatedEntityRecords, normalizeHistoryResponse, METRICS, BREAKDOWN, TEXT };`,
   ).toString("base64")}`,
 );
 
@@ -82,10 +82,35 @@ test("discovers vehicle entities by config entry and total-points unique ID", ()
 
 test("personal statistics use actual Eco Coach sensor keys", () => {
   assert.deepEqual(cardModule.METRICS.slice(0, 3).map(([key]) => key), [
-    "personal_drive_score",
-    "personal_avg_consumption",
-    "personal_saved_emissions",
+    "drive_score",
+    "avg_consumption",
+    "saved_emissions",
   ]);
+});
+
+test("Dutch breakdown labels use category translations", () => {
+  assert.deepEqual(cardModule.BREAKDOWN.map(([, category]) => cardModule.TEXT.nl[category]), [
+    "Rijden", "Laden", "Parkeren", "Persoonlijke uitdaging",
+  ]);
+});
+
+test("point updates fetch one lightweight page, not a full re-import", async () => {
+  const Card = definitions.get("mbecocoach-card");
+  const card = Object.create(Card.prototype);
+  card._config = { entity: "sensor.total" };
+  card._registryEntity = "sensor.total";
+  card._entryId = "entry-a";
+  card._historyLoading = false;
+  card._lastHistoryFetch = 0;
+  card._related = { latest_driving_award: "sensor.award" };
+  card._hass = { states: { "sensor.award": { last_updated: "2026-10-02T12:00:00Z" } } };
+  card._render = () => {};
+  let fetches = 0;
+  card._fetchHistory = () => { fetches += 1; card._lastHistoryFetch = Date.now(); };
+  card.hass = { states: { "sensor.award": { last_updated: "2026-10-02T12:01:00Z" } } };
+  card.hass = { states: { "sensor.award": { last_updated: "2026-10-02T12:02:00Z" } } };
+  assert.equal(fetches, 1);
+  assert.equal(card.hass.callService, undefined);
 });
 
 test("falls back to the selected total sensor unique-ID prefix", () => {

@@ -3,15 +3,15 @@ const CARD_TYPE = "mbecocoach-card";
 const TOTAL_SUFFIX = "_account_total_points";
 const CATEGORIES = ["driving", "charging", "parking"];
 const BREAKDOWN = [
-  ["recent_driving_points", "Driving"],
-  ["recent_charging_points", "Charging"],
-  ["recent_parking_points", "Parking"],
-  ["recent_personal_challenge_points", "Personal challenge"],
+  ["recent_driving_points", "driving"],
+  ["recent_charging_points", "charging"],
+  ["recent_parking_points", "parking"],
+  ["recent_personal_challenge_points", "personal_challenge"],
 ];
 const METRICS = [
-  ["personal_drive_score", "Drive score"],
-  ["personal_avg_consumption", "Average consumption"],
-  ["personal_saved_emissions", "Saved emissions"],
+  ["drive_score", "Drive score"],
+  ["avg_consumption", "Average consumption"],
+  ["saved_emissions", "Saved emissions"],
   ["daily_drive_score", "Daily drive score"],
   ["daily_consumption", "Daily consumption"],
   ["weekly_drive_score", "Weekly drive score"],
@@ -28,7 +28,7 @@ const TEXT = {
     breakdown: "Points breakdown",
     metrics: "Your stats",
     history: "Recent awards",
-    refresh: "Refresh",
+    refresh: "Re-import history",
     loading: "Loading points history…",
     noAwards: "No individual awards are available yet.",
     noBreakdown: "Points breakdown is not available.",
@@ -37,7 +37,7 @@ const TEXT = {
     registryError: "Eco Coach entities could not be discovered. Check the card configuration and try again.",
     historyError: "Points history could not be loaded. Try refreshing.",
     refreshError: "Refresh failed. Check that the Eco Coach history button is available, then try again.",
-    refreshing: "Refreshing…",
+    refreshing: "Re-importing…",
     driving: "Driving",
     charging: "Charging",
     parking: "Parking",
@@ -59,16 +59,16 @@ const TEXT = {
     breakdown: "Puntenoverzicht",
     metrics: "Jouw statistieken",
     history: "Recente punten",
-    refresh: "Verversen",
+    refresh: "Geschiedenis opnieuw importeren",
     loading: "Puntenoverzicht laden…",
     noAwards: "Er zijn nog geen losse punten beschikbaar.",
     noBreakdown: "Puntenoverzicht is niet beschikbaar.",
     configure: "Kies de sensor Totaal aantal accountpunten in de kaartinstellingen.",
     invalidEntity: "Selecteer een Eco Coach-sensor voor het totaal aantal accountpunten.",
     registryError: "Eco Coach-entiteiten konden niet worden gevonden. Controleer de kaartinstellingen en probeer opnieuw.",
-    historyError: "Puntenoverzicht kon niet worden geladen. Probeer opnieuw te verversen.",
-    refreshError: "Verversen mislukt. Controleer of de Eco Coach-knop voor punten beschikbaar is.",
-    refreshing: "Verversen…",
+    historyError: "Puntenoverzicht kon niet worden geladen. Probeer het later opnieuw.",
+    refreshError: "Herimport mislukt. Controleer of de Eco Coach-knop voor punten beschikbaar is.",
+    refreshing: "Opnieuw importeren…",
     driving: "Rijden",
     charging: "Laden",
     parking: "Parkeren",
@@ -100,7 +100,7 @@ const STYLE = `
   h2 { margin: 4px 0 0; font-size: 1.25rem; font-weight: 650; }
   .subtitle { margin: 5px 0 0; color: var(--secondary-text-color); font-size: .9rem; }
   .refresh {
-    flex: 0 0 auto; border: 1px solid var(--divider-color); border-radius: 999px;
+    flex: 0 1 auto; max-width: 50%; border: 1px solid var(--divider-color); border-radius: 999px;
     padding: 9px 14px; background: var(--secondary-background-color);
     color: var(--primary-text-color); font: inherit; cursor: pointer;
   }
@@ -263,6 +263,7 @@ class EcoCoachCard extends HTMLElement {
     this._historyLoading = false;
     this._historyError = false;
     this._history = { total: 0, offset: 0, awards: [] };
+    this._lastHistoryFetch = 0;
     this._refreshing = false;
     this._refreshError = false;
   }
@@ -288,9 +289,23 @@ class EcoCoachCard extends HTMLElement {
   }
 
   set hass(hass) {
+    const previous = this._hass;
     this._hass = hass;
     const entity = this._config.entity;
     if (entity && this._registryEntity !== entity) this._loadRegistry();
+    else if (this._entryId && !this._historyLoading && Date.now() - this._lastHistoryFetch >= 60_000) {
+      const watched = [
+        "account_total_points",
+        "latest_driving_award",
+        "latest_charging_award",
+        "latest_parking_award",
+        ...BREAKDOWN.map(([suffix]) => suffix),
+      ];
+      if (watched.some((key) => {
+        const id = this._related[key];
+        return id && previous?.states?.[id]?.last_updated !== hass.states?.[id]?.last_updated;
+      })) this._fetchHistory();
+    }
     this._render();
   }
 
@@ -314,6 +329,7 @@ class EcoCoachCard extends HTMLElement {
     this._historyLoading = false;
     this._historyError = false;
     this._history = { total: 0, offset: 0, awards: [] };
+    this._lastHistoryFetch = 0;
   }
 
   async _loadRegistry(force = false) {
@@ -364,6 +380,7 @@ class EcoCoachCard extends HTMLElement {
     const hass = this._hass;
     if (!entryId || !hass?.callService || (this._historyLoading && !force)) return;
     const requestId = ++this._historyRequestId;
+    this._lastHistoryFetch = Date.now();
     this._historyLoading = true;
     this._historyError = false;
     this._render();
@@ -511,14 +528,14 @@ class EcoCoachCard extends HTMLElement {
     const breakdownGrid = document.createElement("div");
     breakdownGrid.className = "grid";
     let breakdownCount = 0;
-    for (const [suffix, fallback] of BREAKDOWN) {
+    for (const [suffix, category] of BREAKDOWN) {
       const state = this._state(this._related[suffix]);
       if (!state) continue;
       const tile = document.createElement("div");
       tile.className = "tile";
       const label = document.createElement("div");
       label.className = "tile-label";
-      label.textContent = labels[suffix] || fallback;
+      label.textContent = labels[category];
       const value = document.createElement("div");
       value.className = "tile-value";
       value.textContent = ["unknown", "unavailable"].includes(state.state) ? "—" : this._number(state.state);

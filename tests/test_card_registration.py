@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.mbecocoach import async_setup_entry, async_unload_entry
+from custom_components.mbecocoach import async_setup, async_setup_entry, async_unload_entry
 from custom_components.mbecocoach.const import CONF_TOKEN, CONF_VIN, DOMAIN
 
 
@@ -29,6 +29,7 @@ async def test_card_is_served_once_and_loaded_while_any_entry_is_active() -> Non
         patch("custom_components.mbecocoach.remove_extra_js_url") as remove_js,
         patch("custom_components.mbecocoach.async_get_clientsession"),
     ):
+        assert await async_setup(hass, {}) is True
         coordinator.return_value.async_config_entry_first_refresh = AsyncMock()
         coordinator.return_value.async_initialize_history = AsyncMock()
         await async_setup_entry(hass, first)

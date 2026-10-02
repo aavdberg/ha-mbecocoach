@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import ConfigEntrySelector, ConfigEntrySelectorConfig
+from homeassistant.helpers.typing import ConfigType
 
 from .api import EcoCoachClient
 from .const import CONF_TOKEN, CONF_VIN, DOMAIN
@@ -21,7 +22,14 @@ type EcoCoachConfigEntry = ConfigEntry[EcoCoachCoordinator]
 
 _CARD_PATH = "/mbecocoach/mbecocoach-card.js"
 _CARD_URL = f"{_CARD_PATH}?v=0.7.0"
-_CARD_REGISTERED = f"{DOMAIN}_card_registered"
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the card route once, before config entries are set up."""
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(_CARD_PATH, str(Path(__file__).parent / "frontend" / "mbecocoach-card.js"))]
+    )
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> bool:
@@ -33,11 +41,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "event", "button"])
     loaded_entries: set[str] = hass.data.setdefault(DOMAIN, set())
-    if not hass.data.get(_CARD_REGISTERED):
-        await hass.http.async_register_static_paths(
-            [StaticPathConfig(_CARD_PATH, str(Path(__file__).parent / "frontend" / "mbecocoach-card.js"))]
-        )
-        hass.data[_CARD_REGISTERED] = True
     if not loaded_entries:
         add_extra_js_url(hass, _CARD_URL)
     loaded_entries.add(entry.entry_id)
