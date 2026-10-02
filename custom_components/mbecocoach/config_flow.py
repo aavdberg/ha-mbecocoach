@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -9,19 +10,32 @@ from zoneinfo import ZoneInfo
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .api import EcoCoachAuthError, EcoCoachClient, EcoCoachConnectionError, EcoCoachError
 from .const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, CONF_VIN, DOMAIN
-from .oauth import OAuthAttempt, exchange_code
+from .direct_login import EcoCoachMfaRequired, EcoCoachUnsupportedLogin, async_direct_login
+from .oauth import OAuthAttempt, TokenSet, exchange_code
 
 VIN_PATTERN = re.compile(r"[A-HJ-NPR-Z0-9]{17}\Z")
 TOKEN_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
 URL_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.URL))
+LOGIN_MODE_SELECTOR = SelectSelector(SelectSelectorConfig(options=["browser", "direct"], translation_key="login_mode"))
+_LOGGER = logging.getLogger(__name__)
+
+
+class EcoCoachStatisticsVerificationError(EcoCoachError):
+    """An OAuth login succeeded, but Eco Coach statistics could not be verified."""
 
 
 class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Authorize Eco Coach in a desktop browser, or supply an existing token."""
+    """Authorize Eco Coach in a browser or isolated CIAM session, or use a token."""
 
     VERSION = 1
 
@@ -50,23 +64,88 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         return self.async_create_entry(title=f"Eco Coach {vin}", data=data)
                 else:
                     self._vin = vin
+                    if user_input.get("login_mode") == "direct":
+                        return await self.async_step_direct()
                     return await self.async_step_authorize()
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({vol.Required(CONF_VIN): str, vol.Optional(CONF_TOKEN): TOKEN_SELECTOR}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_VIN): str,
+                    vol.Optional(CONF_TOKEN): TOKEN_SELECTOR,
+                    vol.Optional("login_mode", default="browser"): LOGIN_MODE_SELECTOR,
+                }
+            ),
             errors=errors,
         )
 
     async def _verify(self, vin: str, token: str) -> None:
         client = EcoCoachClient(async_get_clientsession(self.hass), token, ZoneInfo(self.hass.config.time_zone))
-        await client.async_personal_statistics(vin)
-        await client.async_period_statistics(vin)
+        try:
+            await client.async_personal_statistics(vin)
+        except EcoCoachError as err:
+            _LOGGER.warning("Eco Coach personal statistics verification failed (%s)", type(err).__name__)
+            raise
+        try:
+            await client.async_period_statistics(vin)
+        except EcoCoachError as err:
+            _LOGGER.warning("Eco Coach period statistics verification failed (%s)", type(err).__name__)
+            raise
 
     async def async_step_authorize(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
         """Offer a PKCE URL for a desktop browser; the callback stays in this flow."""
         self._attempt = OAuthAttempt()
         return await self.async_step_callback()
+
+    def _finish_login(self, tokens: TokenSet) -> config_entries.ConfigFlowResult:
+        """Store OAuth credentials, but never the username or password."""
+        data = {
+            CONF_VIN: self._vin,
+            CONF_TOKEN: tokens.access_token,
+            CONF_REFRESH_TOKEN: tokens.refresh_token,
+            CONF_EXPIRES_AT: tokens.expires_at,
+        }
+        if hasattr(self, "_reauth_entry"):
+            return self.async_update_reload_and_abort(self._reauth_entry, data=data)
+        return self.async_create_entry(title=f"Eco Coach {self._vin}", data=data)
+
+    async def async_step_direct(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
+        """Try an isolated CIAM session; never keep account credentials."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            username = user_input["username"].strip()
+            password = user_input["password"]
+            if not username or not password:
+                errors["base"] = "invalid_auth"
+            else:
+                try:
+                    tokens = await async_direct_login(self.hass, username, password)
+                    _LOGGER.debug("Eco Coach direct login verifying vehicle statistics")
+                    try:
+                        await self._verify(self._vin, tokens.access_token)
+                    except EcoCoachError as err:
+                        raise EcoCoachStatisticsVerificationError from err
+                except EcoCoachStatisticsVerificationError:
+                    errors["base"] = "statistics_verification_failed"
+                except EcoCoachMfaRequired:
+                    errors["base"] = "mfa_required"
+                except EcoCoachUnsupportedLogin:
+                    errors["base"] = "unsupported_login"
+                except EcoCoachAuthError:
+                    errors["base"] = "invalid_auth"
+                except EcoCoachConnectionError:
+                    errors["base"] = "cannot_connect"
+                except EcoCoachError:
+                    errors["base"] = "invalid_response"
+                else:
+                    _LOGGER.debug("Eco Coach direct login vehicle statistics verified")
+                    return self._finish_login(tokens)
+        return self.async_show_form(
+            step_id="direct",
+            data_schema=vol.Schema({vol.Required("username"): str, vol.Required("password"): TOKEN_SELECTOR}),
+            errors=errors,
+        )
 
     async def async_step_callback(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
         """Accept only the full callback URL matching this PKCE session."""
@@ -84,15 +163,7 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except EcoCoachError:
                 errors["base"] = "invalid_response"
             else:
-                data = {
-                    CONF_VIN: self._vin,
-                    CONF_TOKEN: tokens.access_token,
-                    CONF_REFRESH_TOKEN: tokens.refresh_token,
-                    CONF_EXPIRES_AT: tokens.expires_at,
-                }
-                if hasattr(self, "_reauth_entry"):
-                    return self.async_update_reload_and_abort(self._reauth_entry, data=data)
-                return self.async_create_entry(title=f"Eco Coach {self._vin}", data=data)
+                return self._finish_login(tokens)
         return self.async_show_form(
             step_id="callback",
             data_schema=vol.Schema(
@@ -119,6 +190,8 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             token = user_input.get(CONF_TOKEN, "").strip()
             if not token:
                 self._vin = self._reauth_entry.data[CONF_VIN]
+                if user_input.get("login_mode") == "direct":
+                    return await self.async_step_direct()
                 return await self.async_step_authorize()
             else:
                 try:
@@ -136,6 +209,11 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Optional(CONF_TOKEN): TOKEN_SELECTOR}),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_TOKEN): TOKEN_SELECTOR,
+                    vol.Optional("login_mode", default="browser"): LOGIN_MODE_SELECTOR,
+                }
+            ),
             errors=errors,
         )

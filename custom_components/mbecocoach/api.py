@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, tzinfo
@@ -10,6 +11,8 @@ from typing import Any
 from aiohttp import ClientError, ClientSession
 
 from .const import BASE_URL
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class EcoCoachError(Exception):
@@ -179,15 +182,17 @@ class EcoCoachClient:
     async def async_personal_statistics(self, vin: str) -> PersonalStatistics:
         """Fetch personal statistics for one vehicle."""
         url = f"{BASE_URL}/api/v5/{vin}/statistics/personal"
-        payload = await self._async_get(url, statistics_period(datetime.now(self._timezone).date(), self._timezone))
+        payload = await self._async_get(
+            url, "personal", statistics_period(datetime.now(self._timezone).date(), self._timezone)
+        )
         return parse_statistics(payload)
 
     async def async_period_statistics(self, vin: str) -> tuple[PeriodStatistics, PeriodStatistics, PeriodStatistics]:
         """Fetch daily, weekly, and monthly summaries from the captured route."""
-        payload = await self._async_get(f"{BASE_URL}/api/v5/{vin}/statistics/all")
+        payload = await self._async_get(f"{BASE_URL}/api/v5/{vin}/statistics/all", endpoint="all")
         return parse_period_statistics(payload)
 
-    async def _async_get(self, url: str, params: dict[str, str] | None = None) -> Any:
+    async def _async_get(self, url: str, endpoint: str, params: dict[str, str] | None = None) -> Any:
         """Request an Eco Coach endpoint and handle documented HTTP failures."""
         try:
             async with self._session.get(
@@ -200,11 +205,15 @@ class EcoCoachClient:
                 params=params,
                 timeout=15,
             ) as response:
+                _LOGGER.debug("Eco Coach statistics %s response HTTP %d", endpoint, response.status)
                 if response.status in (401, 403):
+                    _LOGGER.warning("Eco Coach statistics %s authorization failed (HTTP %d)", endpoint, response.status)
                     raise EcoCoachAuthError("Eco Coach rejected the token")
                 if response.status == 429:
+                    _LOGGER.warning("Eco Coach statistics %s request rate limited (HTTP 429)", endpoint)
                     raise EcoCoachRateLimitError("Eco Coach rate limit reached")
                 if response.status != 200:
+                    _LOGGER.warning("Eco Coach statistics %s request failed (HTTP %d)", endpoint, response.status)
                     raise EcoCoachError(f"Statistics request failed (HTTP {response.status})")
                 try:
                     payload = await response.json()

@@ -3,8 +3,13 @@
     "step": {
       "user": {
         "title": "Mercedes Eco Coach",
-        "description": "Voer je VIN in. Laat het token leeg om in een desktopbrowser bij Mercedes in te loggen. Je kunt ook een bestaand access token invullen.",
-        "data": {"vin": "Voertuigidentificatienummer (VIN)", "token": "Bearertoken"}
+        "description": "Voer je VIN in. Kies de bevestigde browseraanmelding of experimenteel rechtstreeks aanmelden zonder callback kopiëren. Een bestaand access token kan ook.",
+        "data": {"vin": "Voertuigidentificatienummer (VIN)", "token": "Bearertoken", "login_mode": "Aanmeldmethode"}
+      },
+      "direct": {
+        "title": "Experimenteel rechtstreeks aanmelden",
+        "description": "Voer je Mercedes-accountgegevens eenmalig in. Home Assistant verstuurt het wachtwoord naar Mercedes maar bewaart het NIET in de configuratie. MFA en extra bevestigingsschermen worden niet ondersteund; annuleer en gebruik dan de browseraanmelding.",
+        "data": {"username": "Mercedes-account e-mail of telefoonnummer", "password": "Wachtwoord"}
       },
       "callback": {
         "title": "Mercedes-aanmelding voltooien",
@@ -13,14 +18,17 @@
       },
       "reauth_confirm": {
         "title": "Eco Coach-token vernieuwen",
-        "description": "Laat het token leeg om opnieuw via de browser in te loggen, of voer een vervangend bearertoken in.",
-        "data": {"token": "Bearertoken"}
+        "description": "Laat het token leeg om opnieuw aan te melden, kies experimenteel rechtstreeks aanmelden, of vul een nieuw bearertoken in.",
+        "data": {"token": "Bearertoken", "login_mode": "Aanmeldmethode"}
       }
     },
     "error": {
       "invalid_vin": "Voer een geldig VIN van 17 tekens in.",
       "invalid_token": "Voer een token in.",
       "invalid_auth": "Mercedes wees de aanmelding af of de terugkeer-URL is ongeldig of verlopen. Start indien nodig een nieuwe aanmelding.",
+      "unsupported_login": "Mercedes vereist een extra of gewijzigde aanmeldstap. Annuleer en gebruik de browseraanmelding.",
+      "statistics_verification_failed": "Aanmelden bij Mercedes is gelukt, maar Eco Coach kon de voertuigstatistieken niet verifiëren. Probeer je wachtwoord niet opnieuw; controleer in de Home Assistant-log welke statistiekstap faalde.",
+      "mfa_required": "Mercedes vereist MFA. Annuleer en gebruik de browseraanmelding.",
       "cannot_connect": "De Mercedes-aanmelding of Eco Coach-statistiekserver is niet bereikbaar.",
       "invalid_response": "De aanmeld- of statistiekserver gaf een onbekend antwoord."
     },
@@ -29,6 +37,7 @@
       "reauth_successful": "Token bijgewerkt."
     }
   },
+  "selector": {"login_mode": {"options": {"browser": "Browseraanmelding (bevestigd)", "direct": "Rechtstreeks aanmelden (experimenteel)"}}},
   "entity": {
     "sensor": {
       "drive_score": {"name": "Rijscore"},

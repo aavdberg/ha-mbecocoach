@@ -17,23 +17,27 @@ SENSORS = (
         translation_key="drive_score",
         icon="mdi:car-speed-limiter",
         native_unit_of_measurement="%",
+        suggested_display_precision=1,
     ),
     SensorEntityDescription(
         key="personal_avg_consumption",
         translation_key="avg_consumption",
         icon="mdi:lightning-bolt",
         native_unit_of_measurement="kWh/100 km",
+        suggested_display_precision=1,
     ),
     SensorEntityDescription(
         key="personal_saved_emissions",
         translation_key="saved_emissions",
         icon="mdi:leaf",
         native_unit_of_measurement="kg",
+        suggested_display_precision=2,
     ),
     SensorEntityDescription(
         key="personal_points",
         translation_key="personal_points",
         icon="mdi:star-circle",
+        suggested_display_precision=0,
     ),
 )
 
@@ -43,6 +47,7 @@ PERIOD_SENSORS = tuple(
         translation_key=f"{period}_{metric}",
         icon=icon,
         native_unit_of_measurement=unit,
+        suggested_display_precision=0 if metric == "points" else 1,
     )
     for period in ("daily", "weekly", "monthly")
     for metric, icon, unit in (

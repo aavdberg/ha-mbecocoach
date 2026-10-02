@@ -59,3 +59,34 @@ def test_missing_sensor_value() -> None:
     )
     entity = EcoCoachSensor(coordinator, MagicMock(data={CONF_VIN: VIN}), PERIOD_SENSORS[0])
     assert entity.native_value is None
+
+
+@pytest.mark.parametrize(
+    ("key", "precision"),
+    [
+        ("personal_drive_score", 1),
+        ("personal_avg_consumption", 1),
+        ("personal_saved_emissions", 2),
+        ("personal_points", 0),
+        *(
+            (f"{period}_{metric}", 0 if metric == "points" else 1)
+            for period in ("daily", "weekly", "monthly")
+            for metric in ("drive_score", "consumption", "points")
+        ),
+    ],
+)
+def test_sensor_display_precision_keeps_native_value(key: str, precision: int) -> None:
+    """Suggest concise display without rounding sensor states used by automations."""
+    coordinator = MagicMock()
+    coordinator.data = EcoCoachData(
+        PersonalStatistics(83.1751165623556, 20.9048872180451, 34.979, 2075.0),
+        PeriodStatistics(83.1751165623556, 20.9048872180451, 2075.0),
+        PeriodStatistics(83.1751165623556, 20.9048872180451, 2075.0),
+        PeriodStatistics(83.1751165623556, 20.9048872180451, 2075.0),
+    )
+    description = next(desc for desc in (*SENSORS, *PERIOD_SENSORS) if desc.key == key)
+    entity = EcoCoachSensor(coordinator, MagicMock(data={CONF_VIN: VIN}), description)
+    assert description.suggested_display_precision == precision
+    assert entity.suggested_display_precision == precision
+    metric = key.split("_", 1)[1]
+    assert entity.native_value == getattr(getattr(coordinator.data, key.split("_", 1)[0]), metric)
