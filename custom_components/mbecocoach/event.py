@@ -52,6 +52,6 @@ class EcoCoachPointsEvent(CoordinatorEntity[EcoCoachCoordinator], EventEntity):
                 )
                 self.async_write_ha_state()
                 emitted = True
-        self._seen_ids = current_ids
+        self._seen_ids.update(current_ids)
         if not emitted:
             super()._handle_coordinator_update()

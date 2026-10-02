@@ -8,7 +8,7 @@ import time
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -39,11 +39,13 @@ class EcoCoachCoordinator(DataUpdateCoordinator[EcoCoachData]):
             await history.async_merge(self.data.awards)
         else:
             try:
-                await history.async_replace(await self._client.async_awards(self._vin, all_history=True))
+                awards = await self._client.async_awards(self._vin, all_history=True)
             except EcoCoachAuthError as err:
                 raise ConfigEntryAuthFailed("Eco Coach rejected the points history request") from err
-            except EcoCoachError as err:
-                raise ConfigEntryNotReady("Eco Coach points history could not be fetched") from err
+            except EcoCoachError:
+                _LOGGER.warning("Eco Coach full points history unavailable; starting with recent awards")
+                awards = self.data.awards
+            await history.async_replace(awards)
         self.history = history
 
     async def async_replace_history(self) -> None:
