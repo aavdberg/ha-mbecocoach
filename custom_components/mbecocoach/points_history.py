@@ -21,6 +21,14 @@ class PointsHistory:
     def count(self) -> int:
         return len(self._awards)
 
+    def latest(self, category: str) -> PointsAward | None:
+        """Return the newest award for a category, including imported history."""
+        return max(
+            (award for award in self._awards.values() if award.category == category),
+            key=lambda award: award.occurred_at,
+            default=None,
+        )
+
     async def async_load(self) -> bool:
         """Return false when no archive exists; reject corrupted data."""
         data = await self._store.async_load()

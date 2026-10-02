@@ -25,13 +25,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> 
     await coordinator.async_initialize_history()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "event", "button"])
+    loaded_entries: set[str] = hass.data.setdefault(DOMAIN, set())
+    loaded_entries.add(entry.entry_id)
     if not hass.services.has_service(DOMAIN, "get_points_history"):
 
         async def async_get_points_history(call: ServiceCall) -> dict:
             """Read a page from the selected local, minimal point history."""
             entries = hass.config_entries.async_entries(DOMAIN)
             selected = next((item for item in entries if item.entry_id == call.data["entry_id"]), None)
-            if selected is None or selected.runtime_data.history is None:
+            if selected is None or selected.entry_id not in loaded_entries or selected.runtime_data.history is None:
                 raise ValueError("Eco Coach points history is unavailable for this entry")
             return selected.runtime_data.history.page(call.data["offset"], call.data["limit"])
 
@@ -54,6 +56,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> 
 async def async_unload_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> bool:
     """Unload the integration."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, ["sensor", "event", "button"])
-    if unloaded and len(hass.config_entries.async_entries(DOMAIN)) <= 1:
-        hass.services.async_remove(DOMAIN, "get_points_history")
+    if unloaded:
+        loaded_entries: set[str] = hass.data[DOMAIN]
+        loaded_entries.discard(entry.entry_id)
+        if not loaded_entries:
+            hass.services.async_remove(DOMAIN, "get_points_history")
+            hass.data.pop(DOMAIN)
     return unloaded

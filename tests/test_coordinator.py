@@ -72,9 +72,11 @@ async def test_initial_history_fetches_only_when_cache_missing() -> None:
     client.async_awards = AsyncMock(return_value=())
     entry = MagicMock(data={CONF_VIN: VIN, CONF_TOKEN: "manual"}, entry_id="synthetic-entry")
     coordinator = EcoCoachCoordinator(MagicMock(), client, VIN, entry)
+    coordinator.data = MagicMock(awards=())
     with patch("custom_components.mbecocoach.coordinator.PointsHistory") as history:
         history.return_value.async_load = AsyncMock(return_value=False)
         history.return_value.async_replace = AsyncMock()
+        history.return_value.async_merge = AsyncMock()
         await coordinator.async_initialize_history()
         client.async_awards.assert_awaited_once_with(VIN, all_history=True)
         history.return_value.async_replace.assert_awaited_once_with(())
@@ -82,3 +84,4 @@ async def test_initial_history_fetches_only_when_cache_missing() -> None:
         client.async_awards.reset_mock()
         await coordinator.async_initialize_history()
         client.async_awards.assert_not_awaited()
+        history.return_value.async_merge.assert_awaited_once_with(coordinator.data.awards)

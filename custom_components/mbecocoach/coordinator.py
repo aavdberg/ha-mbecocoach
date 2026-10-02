@@ -35,7 +35,9 @@ class EcoCoachCoordinator(DataUpdateCoordinator[EcoCoachData]):
     async def async_initialize_history(self) -> None:
         """Fetch old awards once on installation, then use the private local cache."""
         history = PointsHistory(self.hass, self._entry.entry_id)
-        if not await history.async_load():
+        if await history.async_load():
+            await history.async_merge(self.data.awards)
+        else:
             try:
                 await history.async_replace(await self._client.async_awards(self._vin, all_history=True))
             except EcoCoachAuthError as err:
@@ -51,6 +53,7 @@ class EcoCoachCoordinator(DataUpdateCoordinator[EcoCoachData]):
         async with self._history_lock:
             awards = await self._client.async_awards(self._vin, all_history=True)
             await self.history.async_replace(awards)
+            self.async_set_updated_data(self.data)
 
     async def _async_update_data(self) -> EcoCoachData:
         """Retrieve the latest statistics."""

@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.mbecocoach import async_unload_entry
 from custom_components.mbecocoach.api import (
     EcoCoachClient,
     EcoCoachData,
@@ -19,7 +20,7 @@ from custom_components.mbecocoach.api import (
     parse_points,
 )
 from custom_components.mbecocoach.button import EcoCoachHistoryButton
-from custom_components.mbecocoach.const import CONF_VIN
+from custom_components.mbecocoach.const import CONF_VIN, DOMAIN
 from custom_components.mbecocoach.event import EcoCoachPointsEvent
 from custom_components.mbecocoach.points_history import PointsHistory
 from custom_components.mbecocoach.sensor import POINT_SENSORS, EcoCoachSensor
@@ -136,7 +137,7 @@ def test_award_event_only_emits_new_ids() -> None:
     }
     entity.async_write_ha_state.assert_called_once()
     entity._handle_coordinator_update()
-    entity.async_write_ha_state.assert_called_once()
+    assert entity.async_write_ha_state.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -164,6 +165,7 @@ async def test_history_is_replaced_and_paginated_without_extra_fields() -> None:
             "offset": 0,
             "awards": [{"category": "charging", "points": 50, "occurred_at": "2026-01-02T00:00:00+00:00"}],
         }
+        assert history.latest("charging") == award
         await history.async_merge((award,))
         storage.return_value.async_save.assert_awaited_once()
         await history.async_replace(())
@@ -216,11 +218,28 @@ async def test_points_requests_use_observed_routes_and_bounded_recent_window() -
 
 
 def test_latest_award_sensor_has_only_time_attribute() -> None:
-    """Expose a recent individual award without persisting trip/report metadata."""
+    """Expose an imported older award without persisting trip/report metadata."""
     award = PointsAward("synthetic", "driving", 75, datetime(2026, 1, 2, tzinfo=UTC))
     coordinator = MagicMock()
-    coordinator.data = MagicMock(awards=(award,))
+    coordinator.data = MagicMock(awards=())
+    coordinator.history = MagicMock()
+    coordinator.history.latest.return_value = award
     description = next(desc for desc in POINT_SENSORS if desc.key == "latest_driving_award")
     entity = EcoCoachSensor(coordinator, MagicMock(data={CONF_VIN: VIN}), description)
     assert entity.native_value == 75
     assert entity.extra_state_attributes == {"occurred_at": "2026-01-02T00:00:00+00:00"}
+    coordinator.history.latest.assert_called_with("driving")
+
+
+@pytest.mark.asyncio
+async def test_unload_removes_history_service_only_after_last_loaded_entry() -> None:
+    """Disabled/unloaded configured entries must not keep the response service."""
+    hass = MagicMock()
+    hass.data = {DOMAIN: {"first", "second"}}
+    hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+    await async_unload_entry(hass, MagicMock(entry_id="first"))
+    assert hass.data[DOMAIN] == {"second"}
+    hass.services.async_remove.assert_not_called()
+    await async_unload_entry(hass, MagicMock(entry_id="second"))
+    hass.services.async_remove.assert_called_once_with(DOMAIN, "get_points_history")
+    assert DOMAIN not in hass.data

@@ -44,10 +44,14 @@ class EcoCoachPointsEvent(CoordinatorEntity[EcoCoachCoordinator], EventEntity):
         """Publish later awards once; do not backfill historical private activity."""
         awards = self.coordinator.data.awards
         current_ids = {award.id for award in awards}
+        emitted = False
         for award in sorted(awards, key=lambda item: item.occurred_at):
             if award.id not in self._seen_ids:
                 self._trigger_event(
                     award.category, {"points": award.points, "occurred_at": award.occurred_at.isoformat()}
                 )
                 self.async_write_ha_state()
+                emitted = True
         self._seen_ids = current_ids
+        if not emitted:
+            super()._handle_coordinator_update()

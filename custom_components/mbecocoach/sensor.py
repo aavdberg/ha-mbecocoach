@@ -132,11 +132,7 @@ class EcoCoachSensor(CoordinatorEntity[EcoCoachCoordinator], SensorEntity):
 
     def _latest_award(self) -> PointsAward | None:
         category = self.entity_description.key.removeprefix("latest_").removesuffix("_award")
-        return max(
-            (award for award in self.coordinator.data.awards if award.category == category),
-            key=lambda award: award.occurred_at,
-            default=None,
-        )
+        return self.coordinator.history.latest(category) if self.coordinator.history is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, str] | None:
