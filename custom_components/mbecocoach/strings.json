@@ -44,6 +44,14 @@
       "avg_consumption": {"name": "Average consumption"},
       "saved_emissions": {"name": "Saved emissions"},
       "personal_points": {"name": "Personal period points"},
+      "account_total_points": {"name": "Total account points"},
+      "recent_driving_points": {"name": "Driving points (last 7 days)"},
+      "recent_charging_points": {"name": "Charging points (last 7 days)"},
+      "recent_parking_points": {"name": "Parking points (last 7 days)"},
+      "recent_personal_challenge_points": {"name": "Personal challenge points (last 7 days)"},
+      "latest_driving_award": {"name": "Latest driving award"},
+      "latest_charging_award": {"name": "Latest charging award"},
+      "latest_parking_award": {"name": "Latest parking award"},
       "daily_drive_score": {"name": "Daily drive score"},
       "daily_consumption": {"name": "Daily electric consumption"},
       "daily_points": {"name": "Daily points"},
@@ -53,6 +61,12 @@
       "monthly_drive_score": {"name": "Monthly drive score"},
       "monthly_consumption": {"name": "Monthly electric consumption"},
       "monthly_points": {"name": "Monthly points"}
+    },
+    "event": {
+      "points_awarded": {"name": "Points awarded", "state_attributes": {"points": {"name": "Points"}, "occurred_at": {"name": "Occurred at"}}}
+    },
+    "button": {
+      "refresh_points_history": {"name": "Re-import point history"}
     }
   }
 }
