@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import EcoCoachAuthError, EcoCoachClient, EcoCoachData, EcoCoachError
 from .const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, UPDATE_INTERVAL
 from .oauth import refresh_tokens
+from .points_history import PointsHistory
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,6 +29,28 @@ class EcoCoachCoordinator(DataUpdateCoordinator[EcoCoachData]):
         self._client = client
         self._vin = vin
         self._entry = entry
+        self.history: PointsHistory | None = None
+        self._history_lock = asyncio.Lock()
+
+    async def async_initialize_history(self) -> None:
+        """Fetch old awards once on installation, then use the private local cache."""
+        history = PointsHistory(self.hass, self._entry.entry_id)
+        if not await history.async_load():
+            try:
+                await history.async_replace(await self._client.async_awards(self._vin, all_history=True))
+            except EcoCoachAuthError as err:
+                raise ConfigEntryAuthFailed("Eco Coach rejected the points history request") from err
+            except EcoCoachError as err:
+                raise ConfigEntryNotReady("Eco Coach points history could not be fetched") from err
+        self.history = history
+
+    async def async_replace_history(self) -> None:
+        """Manually re-import all points without changing HA recorder history."""
+        if self.history is None:
+            raise EcoCoachError("Points history has not been initialized")
+        async with self._history_lock:
+            awards = await self._client.async_awards(self._vin, all_history=True)
+            await self.history.async_replace(awards)
 
     async def _async_update_data(self) -> EcoCoachData:
         """Retrieve the latest statistics."""
@@ -46,7 +70,12 @@ class EcoCoachCoordinator(DataUpdateCoordinator[EcoCoachData]):
                 )
             personal = await self._client.async_personal_statistics(self._vin)
             daily, weekly, monthly = await self._client.async_period_statistics(self._vin)
-            return EcoCoachData(personal, daily, weekly, monthly)
+            points = await self._client.async_points()
+            awards = await self._client.async_awards(self._vin)
+            if self.history is not None:
+                async with self._history_lock:
+                    await self.history.async_merge(awards)
+            return EcoCoachData(personal, daily, weekly, monthly, points, awards)
         except EcoCoachAuthError as err:
             raise ConfigEntryAuthFailed("Eco Coach token expired or was rejected") from err
         except EcoCoachError as err:

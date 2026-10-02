@@ -8,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import EcoCoachConfigEntry
+from .api import PointsAward
 from .const import CONF_VIN, DOMAIN
 from .coordinator import EcoCoachCoordinator
 
@@ -57,12 +58,39 @@ PERIOD_SENSORS = tuple(
     )
 )
 
+POINT_SENSORS = (
+    SensorEntityDescription(
+        key="account_total_points",
+        translation_key="account_total_points",
+        icon="mdi:star-circle",
+        suggested_display_precision=0,
+    ),
+    *(
+        SensorEntityDescription(
+            key=f"recent_{category.lower()}_points",
+            translation_key=f"recent_{category.lower()}_points",
+            icon="mdi:star-circle",
+            suggested_display_precision=0,
+        )
+        for category in ("DRIVING", "CHARGING", "PARKING", "PERSONAL_CHALLENGE")
+    ),
+    *(
+        SensorEntityDescription(
+            key=f"latest_{category}_award",
+            translation_key=f"latest_{category}_award",
+            icon="mdi:star-circle",
+            suggested_display_precision=0,
+        )
+        for category in ("driving", "charging", "parking")
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: EcoCoachConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Register observed metrics."""
-    descriptions = (*SENSORS, *PERIOD_SENSORS)
+    descriptions = (*SENSORS, *PERIOD_SENSORS, *POINT_SENSORS)
     async_add_entities(EcoCoachSensor(entry.runtime_data, entry, description) for description in descriptions)
 
 
@@ -88,6 +116,32 @@ class EcoCoachSensor(CoordinatorEntity[EcoCoachCoordinator], SensorEntity):
     @property
     def native_value(self) -> float | None:
         """Return the captured metric or unknown when absent."""
+        if self.entity_description.key == "account_total_points":
+            return self.coordinator.data.points.total if self.coordinator.data.points is not None else None
+        if self.entity_description.key.startswith("latest_"):
+            award = self._latest_award()
+            return award.points if award else None
+        if self.entity_description.key.startswith("recent_"):
+            if self.coordinator.data.points is None:
+                return None
+            category = self.entity_description.key.removeprefix("recent_").removesuffix("_points").upper()
+            return self.coordinator.data.points.recent.get(category, 0)
         period, _, metric = self.entity_description.key.partition("_")
         data = getattr(self.coordinator.data, period, None)
         return getattr(data, metric, None)
+
+    def _latest_award(self) -> PointsAward | None:
+        category = self.entity_description.key.removeprefix("latest_").removesuffix("_award")
+        return max(
+            (award for award in self.coordinator.data.awards if award.category == category),
+            key=lambda award: award.occurred_at,
+            default=None,
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        """Expose only the time of the most recent award, never trip details."""
+        if not self.entity_description.key.startswith("latest_"):
+            return None
+        award = self._latest_award()
+        return {"occurred_at": award.occurred_at.isoformat()} if award else None
