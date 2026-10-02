@@ -4,7 +4,7 @@
       "user": {
         "title": "Mercedes Eco Coach",
         "description": "Enter your VIN. Choose browser login (confirmed) or experimental direct login (no callback copying). An existing access token can also be entered.",
-        "data": {"vin": "Vehicle identification number (VIN)", "token": "Bearer token"}
+        "data": {"vin": "Vehicle identification number (VIN)", "token": "Bearer token", "login_mode": "Login method"}
       },
       "direct": {
         "title": "Experimental direct Mercedes login",
@@ -19,13 +19,14 @@
       "reauth_confirm": {
         "title": "Renew Eco Coach token",
         "description": "Leave the token empty to start another login, select experimental direct login, or enter a replacement bearer token.",
-        "data": {"token": "Bearer token"}
+        "data": {"token": "Bearer token", "login_mode": "Login method"}
       }
     },
     "error": {
       "invalid_vin": "Enter a valid 17-character VIN.",
       "invalid_token": "Enter a non-empty token.",
       "invalid_auth": "Mercedes rejected the authorization, or the callback was invalid or expired. Start a new login if needed.",
+      "unsupported_login": "Mercedes requires an additional or changed login step. Cancel and use browser login instead.",
       "mfa_required": "Mercedes requires MFA. Cancel and use browser login instead.",
       "cannot_connect": "The Mercedes login or Eco Coach statistics server could not be reached.",
       "invalid_response": "The login or statistics server returned an unsupported response."
@@ -35,6 +36,7 @@
       "reauth_successful": "Token updated."
     }
   },
+  "selector": {"login_mode": {"options": {"browser": "Browser login (confirmed)", "direct": "Direct login (experimental)"}}},
   "entity": {
     "sensor": {
       "drive_score": {"name": "Drive score"},

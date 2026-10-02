@@ -10,7 +10,7 @@ import voluptuous as vol
 from custom_components.mbecocoach.api import EcoCoachAuthError
 from custom_components.mbecocoach.config_flow import EcoCoachConfigFlow
 from custom_components.mbecocoach.const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, CONF_VIN
-from custom_components.mbecocoach.direct_login import EcoCoachMfaRequired
+from custom_components.mbecocoach.direct_login import EcoCoachMfaRequired, EcoCoachUnsupportedLogin
 from custom_components.mbecocoach.oauth import TokenSet
 
 VIN = "WDD12345678901234"
@@ -203,3 +203,16 @@ async def test_direct_login_mfa_keeps_entry_unmodified() -> None:
         await flow.async_step_direct({"username": "user", "password": "passphrase"})
     assert flow.async_show_form.call_args.kwargs["errors"]["base"] == "mfa_required"
     assert flow._reauth_entry.data[CONF_TOKEN] == "old"
+
+
+@pytest.mark.asyncio
+async def test_direct_login_unsupported_step_has_distinct_error() -> None:
+    """Changed Mercedes sign-in screens should not imply a wrong password."""
+    flow = EcoCoachConfigFlow()
+    flow.hass = MagicMock()
+    flow._vin = VIN
+    flow.async_show_form = MagicMock(return_value={"type": "form"})
+    with patch("custom_components.mbecocoach.config_flow.async_direct_login", new_callable=AsyncMock) as login:
+        login.side_effect = EcoCoachUnsupportedLogin("unsupported step")
+        await flow.async_step_direct({"username": "user", "password": "passphrase"})
+    assert flow.async_show_form.call_args.kwargs["errors"] == {"base": "unsupported_login"}

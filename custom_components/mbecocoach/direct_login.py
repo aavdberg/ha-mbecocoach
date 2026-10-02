@@ -29,6 +29,10 @@ class EcoCoachMfaRequired(EcoCoachAuthError):
     """Mercedes requires an additional interactive authentication step."""
 
 
+class EcoCoachUnsupportedLogin(EcoCoachError):
+    """Mercedes returned an additional or changed sign-in step."""
+
+
 def _resume_path(final_url: str) -> str:
     """Return the same-origin authorization continuation from CIAM."""
     url = urlsplit(final_url)
@@ -38,7 +42,11 @@ def _resume_path(final_url: str) -> str:
     if len(resume) != 1 or not resume[0].startswith("/") or resume[0].startswith("//"):
         raise EcoCoachAuthError("Mercedes did not provide an authorization continuation")
     target = urlsplit(urljoin(_ORIGIN, resume[0]))
-    if (target.scheme, target.netloc) != ("https", "id.mercedes-benz.com"):
+    if (target.scheme, target.netloc, target.path) != (
+        "https",
+        "id.mercedes-benz.com",
+        "/as/authorization.oauth2",
+    ) or target.fragment:
         raise EcoCoachAuthError("Invalid Mercedes authorization continuation")
     return resume[0]
 
@@ -96,7 +104,7 @@ async def _login(session: ClientSession, username: str, password: str) -> TokenS
     if outcome.get("result") == "GOTO_LOGIN_OTP":
         raise EcoCoachMfaRequired("Mercedes requires MFA; use browser login")
     if outcome.get("result") != "RESUME2OIDCP" or not isinstance(outcome.get("token"), str) or not outcome["token"]:
-        raise EcoCoachAuthError("Mercedes login requires an unsupported additional step")
+        raise EcoCoachUnsupportedLogin("Mercedes login requires an unsupported additional step")
 
     async with session.post(
         f"{_ORIGIN}{resume}",

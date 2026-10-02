@@ -7,7 +7,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.mbecocoach.api import EcoCoachAuthError
-from custom_components.mbecocoach.direct_login import EcoCoachMfaRequired, _login, _resume_path, async_direct_login
+from custom_components.mbecocoach.direct_login import (
+    EcoCoachMfaRequired,
+    EcoCoachUnsupportedLogin,
+    _login,
+    _resume_path,
+    async_direct_login,
+)
 from custom_components.mbecocoach.oauth import TokenSet
 
 
@@ -27,6 +33,8 @@ def reply(status: int, *, url: str = "", location: str = "", payload: dict | Non
         "https://evil.invalid/ciam/auth/login?resume=/as/resume",
         "https://id.mercedes-benz.com/ciam/auth/login?resume=https://evil.invalid/",
         "https://id.mercedes-benz.com/ciam/auth/login?resume=//evil.invalid/",
+        "https://id.mercedes-benz.com/ciam/auth/login?resume=/ciam/auth/login/pass",
+        "https://id.mercedes-benz.com/ciam/auth/login?resume=/as/authorization.oauth2%23fragment",
         "https://id.mercedes-benz.com/ciam/auth/login",
     ],
 )
@@ -66,7 +74,9 @@ async def test_direct_login_exchanges_state_bound_redirect() -> None:
 async def test_mfa_stops_before_code_exchange() -> None:
     """Do not guess or silently bypass an interactive login challenge."""
     session = MagicMock()
-    session.get.return_value = reply(200, url="https://id.mercedes-benz.com/ciam/auth/login?resume=/as/resume")
+    session.get.return_value = reply(
+        200, url="https://id.mercedes-benz.com/ciam/auth/login?resume=/as/authorization.oauth2"
+    )
     session.post.side_effect = [
         reply(200),
         reply(200, payload={}),
@@ -77,6 +87,20 @@ async def test_mfa_stops_before_code_exchange() -> None:
         patch("custom_components.mbecocoach.direct_login.exchange_code", new_callable=AsyncMock) as exchange,
     ):
         with pytest.raises(EcoCoachMfaRequired):
+            await _login(session, "example", "password")
+        exchange.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unsupported_login_step_stops_before_code_exchange() -> None:
+    """Distinguish changed account verification from invalid credentials."""
+    session = MagicMock()
+    session.get.return_value = reply(
+        200, url="https://id.mercedes-benz.com/ciam/auth/login?resume=/as/authorization.oauth2"
+    )
+    session.post.side_effect = [reply(200), reply(200), reply(200, payload={"result": "GOTO_CONSENT"})]
+    with patch("custom_components.mbecocoach.direct_login.exchange_code", new_callable=AsyncMock) as exchange:
+        with pytest.raises(EcoCoachUnsupportedLogin):
             await _login(session, "example", "password")
         exchange.assert_not_awaited()
 

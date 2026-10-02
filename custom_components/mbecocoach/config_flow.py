@@ -9,16 +9,23 @@ from zoneinfo import ZoneInfo
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .api import EcoCoachAuthError, EcoCoachClient, EcoCoachConnectionError, EcoCoachError
 from .const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, CONF_VIN, DOMAIN
-from .direct_login import EcoCoachMfaRequired, async_direct_login
+from .direct_login import EcoCoachMfaRequired, EcoCoachUnsupportedLogin, async_direct_login
 from .oauth import OAuthAttempt, TokenSet, exchange_code
 
 VIN_PATTERN = re.compile(r"[A-HJ-NPR-Z0-9]{17}\Z")
 TOKEN_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
 URL_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.URL))
+LOGIN_MODE_SELECTOR = SelectSelector(SelectSelectorConfig(options=["browser", "direct"], translation_key="login_mode"))
 
 
 class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -61,9 +68,7 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_VIN): str,
                     vol.Optional(CONF_TOKEN): TOKEN_SELECTOR,
-                    vol.Optional("login_mode", default="browser"): vol.In(
-                        {"browser": "Browser login (confirmed)", "direct": "Direct login (experimental)"}
-                    ),
+                    vol.Optional("login_mode", default="browser"): LOGIN_MODE_SELECTOR,
                 }
             ),
             errors=errors,
@@ -105,6 +110,8 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     await self._verify(self._vin, tokens.access_token)
                 except EcoCoachMfaRequired:
                     errors["base"] = "mfa_required"
+                except EcoCoachUnsupportedLogin:
+                    errors["base"] = "unsupported_login"
                 except EcoCoachAuthError:
                     errors["base"] = "invalid_auth"
                 except EcoCoachConnectionError:
@@ -184,9 +191,7 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_TOKEN): TOKEN_SELECTOR,
-                    vol.Optional("login_mode", default="browser"): vol.In(
-                        {"browser": "Browser login (confirmed)", "direct": "Direct login (experimental)"}
-                    ),
+                    vol.Optional("login_mode", default="browser"): LOGIN_MODE_SELECTOR,
                 }
             ),
             errors=errors,
