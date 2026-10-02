@@ -322,3 +322,84 @@ test("disabled history button is unavailable even if its registry record remains
   assert.equal(card._refreshError, "unavailable");
   assert.equal(card._historyError, false);
 });
+
+test("saved emissions always render with two decimal places", () => {
+  const Card = definitions.get("mbecocoach-card");
+  const card = Object.create(Card.prototype);
+  card._hass = { language: "en" };
+  assert.equal(card._number("12.3", 2, 2), "12.30");
+  assert.equal(card._number("12.349", 2, 2), "12.35");
+  assert.equal(card._number("12.3", 1), "12.3");
+});
+
+test("re-import retains keyboard focus across loading renders", async () => {
+  class Element {
+    constructor(tag) {
+      this.tag = tag;
+      this.children = [];
+      this.dataset = {};
+      this.style = {};
+      this.disabled = false;
+    }
+    append(...children) { this.children.push(...children); }
+    replaceChildren(...children) {
+      this.children = children;
+      if (this === root) this.activeElement = null;
+    }
+    addEventListener() {}
+    setAttribute() {}
+    focus() { root.activeElement = this; }
+    get childElementCount() { return this.children.length; }
+    querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+    querySelectorAll(selector) {
+      const matches = (node) => selector === "[data-focus-key]"
+        ? Boolean(node.dataset.focusKey)
+        : node.tag === selector;
+      return this.children.flatMap((child) => [
+        ...(matches(child) ? [child] : []),
+        ...child.querySelectorAll(selector),
+      ]);
+    }
+  }
+  const root = new Element("shadow");
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: (tag) => new Element(tag) };
+  try {
+    const Card = definitions.get("mbecocoach-card");
+    const card = Object.create(Card.prototype);
+    card.shadowRoot = root;
+    card._config = { entity: "sensor.total" };
+    card._related = { refresh_points_history: "button.history" };
+    card._entryId = "entry";
+    card._historyRequestId = 0;
+    card._historyLoading = false;
+    card._historyError = false;
+    card._historyOffset = 0;
+    card._history = { total: 0, offset: 0, awards: [] };
+    card._refreshing = false;
+    card._refreshError = false;
+    card._pendingFocusKey = null;
+    let finishPress;
+    card._hass = {
+      language: "en",
+      states: {
+        "sensor.total": { state: "12", attributes: {} },
+        "button.history": { state: "2026-10-02T00:00:00Z" },
+      },
+      callService: async (domain) => domain === "button"
+        ? new Promise((resolve) => { finishPress = resolve; })
+        : { response: { total: 0, offset: 0, awards: [] } },
+    };
+    card._render();
+    root.querySelectorAll("[data-focus-key]").find((el) => el.dataset.focusKey === "reimport").focus();
+    const refresh = card._refresh();
+    assert.equal(card._pendingFocusKey, "reimport");
+    assert.equal(root.activeElement.tag, "h3");
+    finishPress();
+    await refresh;
+    assert.equal(root.activeElement.dataset.focusKey, "reimport");
+    assert.equal(card._pendingFocusKey, null);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});

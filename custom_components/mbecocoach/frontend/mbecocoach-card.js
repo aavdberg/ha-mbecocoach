@@ -488,11 +488,14 @@ class EcoCoachCard extends HTMLElement {
     return String(this._hass?.language || "en").toLowerCase().startsWith("nl") ? "nl" : "en";
   }
 
-  _number(value, digits = 0) {
+  _number(value, digits = 0, minimumDigits = 0) {
     const number = Number(value);
     if (!Number.isFinite(number)) return "—";
     const locale = this._hass?.language || "en";
-    return new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(number);
+    return new Intl.NumberFormat(locale, {
+      minimumFractionDigits: minimumDigits,
+      maximumFractionDigits: digits,
+    }).format(number);
   }
 
   _state(entityId) {
@@ -640,7 +643,8 @@ class EcoCoachCard extends HTMLElement {
         const value = document.createElement("div");
         value.className = "tile-value";
         value.textContent = state && !["unknown", "unavailable"].includes(state.state)
-          ? this._number(state.state, suffix === "saved_emissions" ? 2 : 1) : "—";
+          ? this._number(state.state, suffix === "saved_emissions" ? 2 : 1, suffix === "saved_emissions" ? 2 : 0)
+          : "—";
         const unit = state?.attributes?.unit_of_measurement;
         if (unit) {
           const unitLabel = document.createElement("span");
