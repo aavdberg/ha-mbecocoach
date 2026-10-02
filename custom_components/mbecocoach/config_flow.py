@@ -121,6 +121,7 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 try:
                     tokens = await async_direct_login(self.hass, username, password)
+                    _LOGGER.debug("Eco Coach direct login verifying vehicle statistics")
                     try:
                         await self._verify(self._vin, tokens.access_token)
                     except EcoCoachError as err:
@@ -138,6 +139,7 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 except EcoCoachError:
                     errors["base"] = "invalid_response"
                 else:
+                    _LOGGER.debug("Eco Coach direct login vehicle statistics verified")
                     return self._finish_login(tokens)
         return self.async_show_form(
             step_id="direct",

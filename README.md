@@ -29,3 +29,5 @@ Lifetime points, levels, challenges, duels, activity history, reports, coach eve
 ## Development
 
 Create a detailed English issue for each feature or bug. Run `ruff check custom_components tests`, `ruff format --check custom_components tests` and `python -m pytest -q`. GitHub CI also runs hassfest, HACS validation and secret scanning. Never commit tokens, callback URLs, VINs, real trip data or raw captures. Promote `dev` to `main` only when explicitly requested.
+
+For private test-HA troubleshooting, set `logger: {logs: {custom_components.mbecocoach: debug}}` in Home Assistant configuration and restart. Debug messages record only fixed login-stage names, statistics endpoint names (`personal` or `all`) and numeric HTTP status codes; never publish full HA logs or enable HTTP client wire logging, which can expose authorization material. Remove the temporary debug setting when troubleshooting is finished.
