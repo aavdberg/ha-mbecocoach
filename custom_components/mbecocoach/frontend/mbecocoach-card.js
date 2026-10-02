@@ -19,23 +19,40 @@ const METRICS = [
   ["monthly_drive_score", "Monthly drive score"],
   ["monthly_consumption", "Monthly consumption"],
 ];
+const METRIC_GROUPS = [
+  ["personalPeriod", METRICS.slice(0, 3)],
+  ["dailyPeriod", METRICS.slice(3, 5)],
+  ["weeklyPeriod", METRICS.slice(5, 7)],
+  ["monthlyPeriod", METRICS.slice(7)],
+];
+const HISTORY_PAGE_SIZE = 8;
 
 const TEXT = {
   en: {
     title: "Eco Coach",
     subtitle: "Your account points and driving insights",
-    total: "Total account points",
-    breakdown: "Points breakdown",
+    total: "Total account points · all time",
+    breakdown: "Points breakdown · last 7 days",
     metrics: "Your stats",
+    personalPeriod: "Personal · current calendar week",
+    dailyPeriod: "Daily summary",
+    weeklyPeriod: "Weekly summary",
+    monthlyPeriod: "Monthly summary",
     history: "Recent awards",
+    viewAwards: "View awards →",
+    retry: "Try again",
+    previous: "Previous",
+    next: "Next",
+    historyRange: (first, last, total) => `${first}–${last} of ${total} awards`,
     refresh: "Re-import history",
     loading: "Loading points history…",
     noAwards: "No individual awards are available yet.",
     noBreakdown: "Points breakdown is not available.",
+    noMetrics: "Statistics are not available.",
     configure: "Choose the Total account points sensor in this card's settings.",
     invalidEntity: "Select an Eco Coach Total account points sensor.",
     registryError: "Eco Coach entities could not be discovered. Check the card configuration and try again.",
-    historyError: "Points history could not be loaded. Try refreshing.",
+    historyError: "Points history could not be loaded. Try again.",
     refreshError: "Refresh failed. Check that the Eco Coach history button is available, then try again.",
     refreshing: "Re-importing…",
     driving: "Driving",
@@ -55,14 +72,24 @@ const TEXT = {
   nl: {
     title: "Eco Coach",
     subtitle: "Punten en rij-inzichten van je account",
-    total: "Totaal aantal accountpunten",
-    breakdown: "Puntenoverzicht",
+    total: "Totaal aantal accountpunten · vanaf het begin",
+    breakdown: "Puntenoverzicht · afgelopen 7 dagen",
     metrics: "Jouw statistieken",
+    personalPeriod: "Persoonlijk · huidige kalenderweek",
+    dailyPeriod: "Dagoverzicht",
+    weeklyPeriod: "Weekoverzicht",
+    monthlyPeriod: "Maandoverzicht",
     history: "Recente punten",
+    viewAwards: "Bekijk toekenningen →",
+    retry: "Opnieuw proberen",
+    previous: "Vorige",
+    next: "Volgende",
+    historyRange: (first, last, total) => `${first}–${last} van ${total} toekenningen`,
     refresh: "Geschiedenis opnieuw importeren",
     loading: "Puntenoverzicht laden…",
     noAwards: "Er zijn nog geen losse punten beschikbaar.",
     noBreakdown: "Puntenoverzicht is niet beschikbaar.",
+    noMetrics: "Statistieken zijn niet beschikbaar.",
     configure: "Kies de sensor Totaal aantal accountpunten in de kaartinstellingen.",
     invalidEntity: "Selecteer een Eco Coach-sensor voor het totaal aantal accountpunten.",
     registryError: "Eco Coach-entiteiten konden niet worden gevonden. Controleer de kaartinstellingen en probeer opnieuw.",
@@ -106,13 +133,19 @@ const STYLE = `
   }
   .refresh:hover { border-color: var(--primary-color); }
   .refresh:disabled { cursor: wait; opacity: .65; }
+  .clickable { cursor: pointer; font: inherit; text-align: left; color: inherit; }
+  .clickable:hover { outline: 2px solid var(--primary-color); }
+  .clickable:focus-visible, .refresh:focus-visible, .paging button:focus-visible {
+    outline: 3px solid var(--primary-color); outline-offset: 2px;
+  }
   .hero {
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    margin-top: 22px; padding: 22px; border-radius: 16px;
+    margin-top: 22px; padding: 22px; border: 0; border-radius: 16px;
     background: linear-gradient(125deg, var(--success-color, #16865b), var(--primary-color, #477f70));
-    color: var(--text-primary-color, #fff);
+    color: var(--text-primary-color, #fff); font: inherit;
   }
   .hero-label { font-size: .9rem; opacity: .9; }
+  .hero-link { display: block; margin-top: 10px; font-size: .85rem; text-decoration: underline; }
   .total { margin-top: 5px; font-size: clamp(2.3rem, 9vw, 3.7rem); line-height: 1; font-weight: 720; letter-spacing: -.04em; }
   .star { font-size: 2.1rem; opacity: .9; }
   section { margin-top: 24px; }
@@ -124,6 +157,13 @@ const STYLE = `
   }
   .tile-label { color: var(--secondary-text-color); font-size: .82rem; }
   .tile-value { margin-top: 6px; font-size: 1.25rem; font-weight: 650; overflow-wrap: anywhere; }
+  .tile-unit { font-size: .8rem; font-weight: 500; white-space: nowrap; }
+  .period { margin: 18px 0 10px; color: var(--secondary-text-color); font-size: .85rem; }
+  .paging { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; }
+  .paging button { padding: 7px 11px; border-radius: 8px; border: 1px solid var(--divider-color);
+    background: var(--secondary-background-color); color: var(--primary-text-color); cursor: pointer; }
+  .paging button:disabled { opacity: .5; cursor: default; }
+  .paging span { color: var(--secondary-text-color); font-size: .8rem; text-align: center; }
   .awards { display: grid; gap: 2px; }
   .award {
     display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center;
@@ -263,9 +303,11 @@ class EcoCoachCard extends HTMLElement {
     this._historyLoading = false;
     this._historyError = false;
     this._history = { total: 0, offset: 0, awards: [] };
+    this._historyOffset = 0;
     this._lastHistoryFetch = 0;
     this._refreshing = false;
     this._refreshError = false;
+    this._pendingFocusKey = null;
   }
 
   static getConfigElement() {
@@ -329,7 +371,9 @@ class EcoCoachCard extends HTMLElement {
     this._historyLoading = false;
     this._historyError = false;
     this._history = { total: 0, offset: 0, awards: [] };
+    this._historyOffset = 0;
     this._lastHistoryFetch = 0;
+    this._pendingFocusKey = null;
   }
 
   async _loadRegistry(force = false) {
@@ -375,7 +419,7 @@ class EcoCoachCard extends HTMLElement {
     }
   }
 
-  async _fetchHistory(force = false) {
+  async _fetchHistory(force = false, offset = 0) {
     const entryId = this._entryId;
     const hass = this._hass;
     if (!entryId || !hass?.callService || (this._historyLoading && !force)) return;
@@ -388,7 +432,7 @@ class EcoCoachCard extends HTMLElement {
       const response = await hass.callService(
         DOMAIN,
         "get_points_history",
-        { entry_id: entryId, offset: 0, limit: 8 },
+        { entry_id: entryId, offset, limit: HISTORY_PAGE_SIZE },
         undefined,
         undefined,
         true,
@@ -396,6 +440,7 @@ class EcoCoachCard extends HTMLElement {
       const history = normalizeHistoryResponse(response);
       if (requestId !== this._historyRequestId || entryId !== this._entryId) return;
       this._history = history;
+      this._historyOffset = history.offset;
       this._historyError = false;
       this._refreshError = false;
     } catch (_error) {
@@ -448,6 +493,14 @@ class EcoCoachCard extends HTMLElement {
     return entityId ? this._hass?.states?.[entityId] || null : null;
   }
 
+  _moreInfo(entityId) {
+    this.dispatchEvent(new CustomEvent("hass-more-info", {
+      bubbles: true,
+      composed: true,
+      detail: { entityId },
+    }));
+  }
+
   _appendMessage(parent, text, error = false) {
     const message = document.createElement("p");
     message.className = error ? "message error" : "message";
@@ -466,6 +519,8 @@ class EcoCoachCard extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot) return;
+    const active = this.shadowRoot.activeElement;
+    const focusKey = active?.dataset?.focusKey || this._pendingFocusKey;
     const language = this._language();
     const labels = TEXT[language];
     const style = document.createElement("style");
@@ -490,14 +545,21 @@ class EcoCoachCard extends HTMLElement {
     const refresh = document.createElement("button");
     refresh.className = "refresh";
     refresh.type = "button";
+    refresh.dataset.focusKey = "reimport";
     refresh.textContent = this._refreshing ? labels.refreshing : labels.refresh;
     refresh.disabled = this._refreshing || this._historyLoading || this._registryLoading;
     refresh.addEventListener("click", () => this._refresh());
     top.append(heading, refresh);
     content.append(top);
 
-    const hero = document.createElement("div");
-    hero.className = "hero";
+    const hero = document.createElement("button");
+    hero.className = "hero clickable";
+    hero.type = "button";
+    hero.dataset.focusKey = "hero";
+    hero.style.width = "100%";
+    hero.addEventListener("click", () => this.shadowRoot.querySelector("#eco-coach-history")?.scrollIntoView({
+      behavior: "smooth", block: "start",
+    }));
     const totalGroup = document.createElement("div");
     const totalLabel = document.createElement("div");
     totalLabel.className = "hero-label";
@@ -508,7 +570,10 @@ class EcoCoachCard extends HTMLElement {
     total.textContent = totalState && !["unknown", "unavailable"].includes(totalState.state)
       ? this._number(totalState.state)
       : "—";
-    totalGroup.append(totalLabel, total);
+    const heroLink = document.createElement("span");
+    heroLink.className = "hero-link";
+    heroLink.textContent = labels.viewAwards;
+    totalGroup.append(totalLabel, total, heroLink);
     const star = document.createElement("div");
     star.className = "star";
     star.setAttribute("aria-hidden", "true");
@@ -531,8 +596,11 @@ class EcoCoachCard extends HTMLElement {
     for (const [suffix, category] of BREAKDOWN) {
       const state = this._state(this._related[suffix]);
       if (!state) continue;
-      const tile = document.createElement("div");
-      tile.className = "tile";
+      const tile = document.createElement("button");
+      tile.className = "tile clickable";
+      tile.type = "button";
+      tile.dataset.focusKey = `tile:${this._related[suffix]}`;
+      tile.addEventListener("click", () => this._moreInfo(this._related[suffix]));
       const label = document.createElement("div");
       label.className = "tile-label";
       label.textContent = labels[category];
@@ -547,35 +615,63 @@ class EcoCoachCard extends HTMLElement {
     else this._appendMessage(breakdownSection, labels.noBreakdown);
 
     const metricSection = this._section(content, labels.metrics);
-    const metricGrid = document.createElement("div");
-    metricGrid.className = "grid";
     let metricCount = 0;
-    for (const [suffix, fallback] of METRICS) {
-      const entityId = this._related[suffix];
-      const state = this._state(entityId);
-      if (!entityId) continue;
-      const tile = document.createElement("div");
-      tile.className = "tile";
-      const label = document.createElement("div");
-      label.className = "tile-label";
-      label.textContent = labels[suffix] || fallback;
-      const value = document.createElement("div");
-      value.className = "tile-value";
-      const numeric = state && !["unknown", "unavailable"].includes(state.state) ? this._number(state.state, 1) : "—";
-      const unit = state?.attributes?.unit_of_measurement;
-      value.textContent = unit ? `${numeric} ${unit}` : numeric;
-      tile.append(label, value);
-      metricGrid.append(tile);
-      metricCount += 1;
+    for (const [period, metrics] of METRIC_GROUPS) {
+      const metricGrid = document.createElement("div");
+      metricGrid.className = "grid";
+      for (const [suffix, fallback] of metrics) {
+        const entityId = this._related[suffix];
+        if (!entityId) continue;
+        const state = this._state(entityId);
+        const tile = document.createElement("button");
+        tile.className = "tile clickable";
+        tile.type = "button";
+        tile.dataset.focusKey = `tile:${entityId}`;
+        tile.addEventListener("click", () => this._moreInfo(entityId));
+        const label = document.createElement("div");
+        label.className = "tile-label";
+        label.textContent = labels[suffix] || fallback;
+        const value = document.createElement("div");
+        value.className = "tile-value";
+        value.textContent = state && !["unknown", "unavailable"].includes(state.state)
+          ? this._number(state.state, 1) : "—";
+        const unit = state?.attributes?.unit_of_measurement;
+        if (unit) {
+          const unitLabel = document.createElement("span");
+          unitLabel.className = "tile-unit";
+          unitLabel.textContent = ` ${unit}`;
+          value.append(unitLabel);
+        }
+        tile.append(label, value);
+        metricGrid.append(tile);
+        metricCount += 1;
+      }
+      if (metricGrid.childElementCount) {
+        const periodLabel = document.createElement("h4");
+        periodLabel.className = "period";
+        periodLabel.textContent = labels[period];
+        metricSection.append(periodLabel, metricGrid);
+      }
     }
-    if (metricCount) metricSection.append(metricGrid);
+    if (!metricCount) this._appendMessage(metricSection, labels.noMetrics);
 
     const historySection = this._section(content, labels.history);
+    historySection.id = "eco-coach-history";
+    historySection.querySelector("h3").tabIndex = -1;
     if (this._historyError) {
       this._appendMessage(historySection, this._refreshError ? labels.refreshError : labels.historyError, true);
+      if (!this._refreshError) {
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "refresh";
+        retry.textContent = labels.retry;
+        retry.dataset.focusKey = "retry";
+        retry.addEventListener("click", () => this._fetchHistory());
+        historySection.append(retry);
+      }
     }
     else if (this._historyLoading) this._appendMessage(historySection, labels.loading);
-    else if (this._history.awards.length === 0) this._appendMessage(historySection, labels.noAwards);
+    else if (this._history.awards.length === 0 && this._historyOffset === 0) this._appendMessage(historySection, labels.noAwards);
     else {
       const awards = document.createElement("div");
       awards.className = "awards";
@@ -605,10 +701,46 @@ class EcoCoachCard extends HTMLElement {
         awards.append(row);
       }
       historySection.append(awards);
+      const paging = document.createElement("div");
+      paging.className = "paging";
+      const previous = document.createElement("button");
+      previous.type = "button";
+      previous.textContent = labels.previous;
+      previous.dataset.focusKey = "page:previous";
+      previous.disabled = this._historyLoading || this._historyOffset === 0;
+      previous.addEventListener("click", () => this._fetchHistory(false, Math.max(0, this._historyOffset - HISTORY_PAGE_SIZE)));
+      const range = document.createElement("span");
+      range.textContent = labels.historyRange(
+        this._historyOffset + 1, this._historyOffset + this._history.awards.length, this._history.total,
+      );
+      const next = document.createElement("button");
+      next.type = "button";
+      next.textContent = labels.next;
+      next.dataset.focusKey = "page:next";
+      next.disabled = this._historyLoading || !this._history.awards.length
+        || this._historyOffset + this._history.awards.length >= this._history.total;
+      next.addEventListener("click", () => this._fetchHistory(false, this._historyOffset + this._history.awards.length));
+      paging.append(previous, range, next);
+      historySection.append(paging);
     }
 
     card.append(content);
     this.shadowRoot.replaceChildren(style, card);
+    if (active && focusKey) {
+      const controls = [...this.shadowRoot.querySelectorAll("[data-focus-key]")];
+      const target = controls.find((control) => control.dataset.focusKey === focusKey && !control.disabled);
+      if (target) {
+        target.focus();
+        this._pendingFocusKey = null;
+      } else if (focusKey.startsWith("page:")) {
+        this._pendingFocusKey = this._historyLoading ? focusKey : null;
+        const fallback = this._historyLoading ? null : controls.find((control) =>
+          control.dataset.focusKey.startsWith("page:") && !control.disabled);
+        (fallback || historySection.querySelector("h3")).focus();
+      } else {
+        this._pendingFocusKey = null;
+      }
+    }
   }
 }
 

@@ -20,7 +20,7 @@ const source = await readFile(
 );
 const cardModule = await import(
   `data:text/javascript;base64,${Buffer.from(
-    `${source}\nexport { getRelatedEntityRecords, normalizeHistoryResponse, METRICS, BREAKDOWN, TEXT };`,
+    `${source}\nexport { getRelatedEntityRecords, normalizeHistoryResponse, METRICS, METRIC_GROUPS, BREAKDOWN, TEXT };`,
   ).toString("base64")}`,
 );
 
@@ -229,4 +229,33 @@ test("shows a history error when callService returns only context", async () => 
   assert.equal(card._historyError, true);
   assert.equal(card._historyLoading, false);
   assert.deepEqual(card._history.awards, []);
+});
+
+test("pages history with bounded calls and preserves selected entry", async () => {
+  const Card = definitions.get("mbecocoach-card");
+  const card = Object.create(Card.prototype);
+  card._entryId = "entry-a";
+  card._historyRequestId = 0;
+  card._historyLoading = false;
+  card._refreshing = false;
+  const calls = [];
+  card._hass = { callService: async (...args) => {
+    calls.push(args);
+    return { response: { total: 17, offset: args[2].offset, awards: [
+      { category: "driving", points: 1, occurred_at: "2026-10-01T00:00:00Z" },
+    ] } };
+  } };
+  card._render = () => {};
+  await card._fetchHistory(false, 8);
+  assert.equal(card._historyOffset, 8);
+  assert.deepEqual(calls[0][2], { entry_id: "entry-a", offset: 8, limit: 8 });
+  assert.equal(calls[0][5], true);
+});
+
+test("card periods describe the API windows without claiming lifetime categories", () => {
+  assert.match(cardModule.TEXT.en.total, /all time/);
+  assert.match(cardModule.TEXT.en.breakdown, /last 7 days/);
+  assert.match(cardModule.TEXT.en.personalPeriod, /current calendar week/);
+  assert.match(cardModule.TEXT.nl.breakdown, /afgelopen 7 dagen/);
+  assert.deepEqual(cardModule.METRIC_GROUPS.map(([, metrics]) => metrics.length), [3, 2, 2, 2]);
 });
