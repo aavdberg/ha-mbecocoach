@@ -1,4 +1,4 @@
-"""Config flow for a manually supplied Eco Coach bearer token."""
+"""Config flow for Eco Coach browser login or a manually supplied bearer token."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from .oauth import OAuthAttempt, exchange_code
 
 VIN_PATTERN = re.compile(r"[A-HJ-NPR-Z0-9]{17}\Z")
 TOKEN_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
+URL_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.URL))
 
 
 class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -94,7 +95,12 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=f"Eco Coach {self._vin}", data=data)
         return self.async_show_form(
             step_id="callback",
-            data_schema=vol.Schema({vol.Required("callback_url"): TOKEN_SELECTOR}),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional("authorization_url", default=self._attempt.url): URL_SELECTOR,
+                    vol.Required("callback_url"): TOKEN_SELECTOR,
+                }
+            ),
             description_placeholders={"authorization_url": self._attempt.url},
             errors=errors,
         )

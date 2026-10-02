@@ -8,8 +8,8 @@
       },
       "callback": {
         "title": "Mercedes-aanmelding voltooien",
-        "description": "Open deze URL in een desktopbrowser (niet op je telefoon): {authorization_url}\n\nLog in en kopieer de VOLLEDIGE `ecocoach://login/callback?...`-URL uit de adresbalk wanneer de browser de Eco Coach-app niet kan openen. Plak deze binnen 10 minuten hieronder. De URL bevat een eenmalige code: deel deze nooit.",
-        "data": {"callback_url": "Volledige terugkeer-URL"}
+        "description": "Kopieer de vooraf ingevulde autorisatie-URL naar een desktopbrowser (niet je telefoon) en log in. Kopieer daarna de VOLLEDIGE `ecocoach://login/callback?...`-URL uit de adresbalk of geschiedenis naar het callback-veld, binnen 10 minuten. Deel de terugkeer-URL nooit.",
+        "data": {"authorization_url": "Kopieer deze URL naar je desktopbrowser", "callback_url": "Volledige terugkeer-URL"}
       },
       "reauth_confirm": {
         "title": "Eco Coach-token vernieuwen",

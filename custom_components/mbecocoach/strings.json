@@ -8,8 +8,8 @@
       },
       "callback": {
         "title": "Complete Mercedes sign-in",
-        "description": "Open this URL in a desktop browser (not on your phone): {authorization_url}\n\nSign in, then copy the COMPLETE `ecocoach://login/callback?...` URL from the browser's address bar when it cannot open the Eco Coach app. Paste it below within 10 minutes. The callback URL contains a one-time code: never share it.",
-        "data": {"callback_url": "Complete callback URL"}
+        "description": "Copy the prefilled authorization URL into a desktop browser (not your phone) and sign in. When the browser cannot open the Eco Coach app, copy the COMPLETE `ecocoach://login/callback?...` URL from its address bar or history into the callback field within 10 minutes. Never share the callback URL.",
+        "data": {"authorization_url": "Copy this URL and open it in your desktop browser", "callback_url": "Complete callback URL"}
       },
       "reauth_confirm": {
         "title": "Renew Eco Coach token",
