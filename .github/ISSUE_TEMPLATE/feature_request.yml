@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest an Eco Coach integration feature
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Desired behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: API evidence (redacted)
+      description: Do not include tokens, VINs, private URLs with identifiers, or personal data.

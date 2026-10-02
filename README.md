@@ -1,2 +1,49 @@
-# ha-mbecocoach
-Home Assistant custom integration for Mercedes-Benz Eco Coach (experimental)
+# Mercedes Eco Coach for Home Assistant
+
+Experimental Home Assistant 2026.9 custom integration. Not affiliated with Mercedes-Benz. Published code lives on `main`; ongoing development lives on `dev`.
+
+## Install and test
+
+Copy `custom_components/mbecocoach` from the **`main` branch** to your Home Assistant `config/custom_components` folder and restart Home Assistant. The test Home Assistant already has the development version installed. Select **Mercedes Eco Coach** under **Settings → Devices & services → Add integration**.
+
+Enter your 17-character VIN and **leave the optional bearer token blank** to try browser-assisted Mercedes login:
+
+1. Copy the **prefilled authorization URL field above `callback_url`** into a **desktop browser without the Eco Coach mobile app installed**. Home Assistant does not open the browser automatically. Do not use your iPhone for this step.
+2. Sign in to Mercedes Identity in that browser. The registered `ecocoach://login/callback` link may produce a browser error because no desktop app handles it. Copy the **complete callback URL**, including query parameters, from the address bar or browser history.
+3. Within ten minutes, paste it into the Home Assistant form. Never share this URL: it contains a short-lived one-time code. Home Assistant validates the PKCE state, exchanges the code and verifies the Eco Coach statistics endpoints before saving tokens.
+
+**Browser-assisted login was confirmed in test Home Assistant with a real account**, including the first statistics update. In Edge, the failed `ecocoach://` launch appeared in the browser developer console rather than the address bar. Copy the callback only into the local Home Assistant form; some browsers may not expose it at all. Do not send a callback URL, password or access/refresh token to this repository or chat. Alternatively, supply an existing Eco Coach bearer access token in the optional field; that legacy mode cannot renew tokens automatically.
+
+**Experimental no-copy alternative:** On the initial VIN form, choose `direct` and leave the optional access token empty. Enter your Mercedes account email/phone and password in the next Home Assistant form. The integration makes a one-time login attempt using the Eco Coach client and an isolated CIAM cookie session, extracts the code from the app's registered redirect internally, then discards the password and session. Only OAuth tokens are stored after vehicle statistics have been verified. **Direct setup succeeded in test Home Assistant with an Eco Coach account authorized for the selected vehicle**; a different Mercedes account completed OAuth but received HTTP 404 for that vehicle's personal statistics. Use the account associated with the vehicle in Eco Coach. This route cannot complete MFA or additional verification/consent screens; use the confirmed browser flow instead if it fails. The Home Assistant log identifies failed stages and HTTP status codes without recording credentials or response bodies. If statistics verification fails, do not repeatedly submit your password. Never share credentials in issues or chat. Reauthentication also offers `direct` while retaining the browser and manual-token options.
+
+OAuth entries store access and refresh tokens in Home Assistant's config entry storage and renew them before expiration. Secure the storage and backups. If renewal fails, Home Assistant requests reauthentication. In that form, leave the token blank to try a fresh browser login or supply a replacement access token.
+
+## Data
+
+The integration polls the observed `/api/v5/{VIN}/statistics/personal` and `/api/v5/{VIN}/statistics/all` endpoints every 15 minutes. It exposes personal drive score (%), average electric consumption (kWh/100 km), saved emissions (kg), **personal period points** from `pointsSummary.sum.points`, plus daily, weekly and monthly drive score, electric consumption and points where present. Personal period points are **not lifetime account points**. The personal request uses the current and preceding Monday-Sunday calendar weeks in Home Assistant's configured time zone. Missing metrics remain unknown. Trip, message and chart details are not persisted.
+
+Sensors suggest one decimal for scores and electric consumption, two for saved emissions, and no decimals for points. Home Assistant displays concise values while the integration retains the original numeric sensor values for automations.
+
+The observed `/api/v5/user/points` balance is exposed as **Total account points** (not the same as personal period points). Additional sensors show driving, charging, parking and personal-challenge points earned in the **last seven days**, plus the latest individual driving, charging and parking award. These latest-award sensors include only an occurrence time; they contain no trip data. The **Points awarded** event entity records new individual awards in Home Assistant from the time the integration starts; it does not replay older awards into the recorder at an incorrect time.
+
+On initial setup, the integration fetches the vehicle's historical report once (from 2000 onward) and caches only award IDs, category, points and timestamps in Home Assistant's **private local** `.storage`; future 15-minute polls merge recent awards. For a full re-import, press the **Re-import point history** button on the Eco Coach device. This replaces **only this integration's cached awards**, never Home Assistant's recorder data or another integration's entities. To inspect older individual awards without a huge sensor attribute, use **Developer Tools → Actions → `mbecocoach.get_points_history`**, select the Eco Coach integration, and optionally set `offset` and `limit` (1–100). The response gives a total count and newest-first pages with only category, points and occurrence time. Keep Home Assistant storage and backups private.
+
+## Dashboard card
+
+The integration installs an original, app-inspired **Eco Coach** Lovelace card automatically; it does **not** change your dashboards. After installing or upgrading the integration, restart Home Assistant and reload the dashboard in your browser. Choose **Edit dashboard → Add card → Eco Coach**, select the **Total account points** sensor for the vehicle you want to show, and save. Use a second card for another vehicle. Select a statistic tile to open its Home Assistant entity details; select the lifetime account-point banner to jump to the award list. Use **Next** and **Previous** there to browse the locally cached awards eight at a time. The card fetches a small history page again when relevant sensor data changes. Its **Re-import history** control instead runs the potentially expensive full historical re-import and replaces only the Eco Coach history cache. Individual awards have no further details in this integration. If a card added before setup has no vehicle selected, choose a total-points sensor in its editor.
+
+**Periods:** The total account-point balance covers the account's available history, whereas the four breakdown categories use a rolling **last seven days** window. The personal drive score, average consumption and saved emissions use the **current local Monday–Sunday calendar week** requested by the integration. Daily, weekly and monthly score/consumption tiles reflect the correspondingly named aggregates returned by Eco Coach's statistics endpoint; their exact boundaries are provider-defined, not a sum of the other tiles. Select a tile to inspect the entity's recorded history. Levels, challenges and trip-level award details are not available yet.
+
+If a full re-import fails because the Eco Coach API times out or cannot be reached, the card keeps showing the previously cached awards; it does not overwrite or clear them. Full-history requests can take longer than regular polling and have a longer timeout. Wait for connectivity to recover before trying the expensive re-import again. A failed re-import is separate from a missing or disabled history button.
+
+The card uses Home Assistant's theme and its own simple shapes/icons, **not** Mercedes-Benz logos, vehicle images or copied app assets. Its award list shows only category, points and time. If you disable the integration, the card module is no longer loaded until an Eco Coach entry is enabled again.
+
+The 2026-10-02 iOS capture confirmed the public Eco Coach OAuth client ID `022bed8c-3a28-4b1d-b465-9ca0f406b34e`, redirect URI `ecocoach://login/callback`, scopes `openid offline_access email phone profile ciam-uid`, and PKCE `S256`. Home Assistant generates a new random verifier and state for each login. The authorization URL reaches the Mercedes CIAM login page and a user completed the handoff in test Home Assistant. Browser login does not ask Home Assistant for a Mercedes password; the optional experimental direct login does, but never stores it. Automatic token renewal remains unverified against a live expiry.
+
+Levels, challenges, duels, full trip history, reports, coach messages, services and WebSocket updates remain unimplemented. The report includes sensitive trip and message details that are discarded rather than exposed as attributes; see [issue #3](https://github.com/aavdberg/ha-mbecocoach/issues/3). Static Android APK route strings for trends, energy history, transactions and event details are not proof of working HTTP requests.
+
+## Development
+
+Create a detailed English issue for each feature or bug. Run `ruff check custom_components tests`, `ruff format --check custom_components tests` and `python -m pytest -q`. GitHub CI also runs hassfest, HACS validation and secret scanning. Never commit tokens, callback URLs, VINs, real trip data or raw captures. Promote `dev` to `main` only when explicitly requested.
+
+For private test-HA troubleshooting, set `logger: {logs: {custom_components.mbecocoach: debug}}` in Home Assistant configuration and restart. Debug messages record only fixed login-stage names, statistics endpoint names (`personal` or `all`) and numeric HTTP status codes; never publish full HA logs or enable HTTP client wire logging, which can expose authorization material. Remove the temporary debug setting when troubleshooting is finished.

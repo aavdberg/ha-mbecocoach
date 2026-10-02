@@ -1,0 +1,72 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mercedes Eco Coach",
+        "description": "Voer je VIN in. Kies de bevestigde browseraanmelding of experimenteel rechtstreeks aanmelden zonder callback kopiëren. Een bestaand access token kan ook.",
+        "data": {"vin": "Voertuigidentificatienummer (VIN)", "token": "Bearertoken", "login_mode": "Aanmeldmethode"}
+      },
+      "direct": {
+        "title": "Experimenteel rechtstreeks aanmelden",
+        "description": "Voer je Mercedes-accountgegevens eenmalig in. Home Assistant verstuurt het wachtwoord naar Mercedes maar bewaart het NIET in de configuratie. MFA en extra bevestigingsschermen worden niet ondersteund; annuleer en gebruik dan de browseraanmelding.",
+        "data": {"username": "Mercedes-account e-mail of telefoonnummer", "password": "Wachtwoord"}
+      },
+      "callback": {
+        "title": "Mercedes-aanmelding voltooien",
+        "description": "Kopieer de vooraf ingevulde autorisatie-URL naar een desktopbrowser (niet je telefoon) en log in. Kopieer daarna de VOLLEDIGE `ecocoach://login/callback?...`-URL uit de adresbalk of geschiedenis naar het callback-veld, binnen 10 minuten. Deel de terugkeer-URL nooit.",
+        "data": {"authorization_url": "Kopieer deze URL naar je desktopbrowser", "callback_url": "Volledige terugkeer-URL"}
+      },
+      "reauth_confirm": {
+        "title": "Eco Coach-token vernieuwen",
+        "description": "Laat het token leeg om opnieuw aan te melden, kies experimenteel rechtstreeks aanmelden, of vul een nieuw bearertoken in.",
+        "data": {"token": "Bearertoken", "login_mode": "Aanmeldmethode"}
+      }
+    },
+    "error": {
+      "invalid_vin": "Voer een geldig VIN van 17 tekens in.",
+      "invalid_token": "Voer een token in.",
+      "invalid_auth": "Mercedes wees de aanmelding af of de terugkeer-URL is ongeldig of verlopen. Start indien nodig een nieuwe aanmelding.",
+      "unsupported_login": "Mercedes vereist een extra of gewijzigde aanmeldstap. Annuleer en gebruik de browseraanmelding.",
+      "statistics_verification_failed": "Aanmelden bij Mercedes is gelukt, maar Eco Coach kon de voertuigstatistieken niet verifiëren. Probeer je wachtwoord niet opnieuw; controleer in de Home Assistant-log welke statistiekstap faalde.",
+      "mfa_required": "Mercedes vereist MFA. Annuleer en gebruik de browseraanmelding.",
+      "cannot_connect": "De Mercedes-aanmelding of Eco Coach-statistiekserver is niet bereikbaar.",
+      "invalid_response": "De aanmeld- of statistiekserver gaf een onbekend antwoord."
+    },
+    "abort": {
+      "already_configured": "Deze VIN is al geconfigureerd.",
+      "reauth_successful": "Token bijgewerkt."
+    }
+  },
+  "selector": {"login_mode": {"options": {"browser": "Browseraanmelding (bevestigd)", "direct": "Rechtstreeks aanmelden (experimenteel)"}}},
+  "entity": {
+    "sensor": {
+      "drive_score": {"name": "Rijscore"},
+      "avg_consumption": {"name": "Gemiddeld verbruik"},
+      "saved_emissions": {"name": "Bespaarde uitstoot"},
+      "personal_points": {"name": "Persoonlijke periodepunten"},
+      "account_total_points": {"name": "Totaalpunten account"},
+      "recent_driving_points": {"name": "Rijpunten (laatste 7 dagen)"},
+      "recent_charging_points": {"name": "Laadpunten (laatste 7 dagen)"},
+      "recent_parking_points": {"name": "Parkeerpunten (laatste 7 dagen)"},
+      "recent_personal_challenge_points": {"name": "Persoonlijke challengepunten (laatste 7 dagen)"},
+      "latest_driving_award": {"name": "Laatste rijpunten"},
+      "latest_charging_award": {"name": "Laatste laadpunten"},
+      "latest_parking_award": {"name": "Laatste parkeerpunten"},
+      "daily_drive_score": {"name": "Dagelijkse rijscore"},
+      "daily_consumption": {"name": "Dagelijks stroomverbruik"},
+      "daily_points": {"name": "Dagelijkse punten"},
+      "weekly_drive_score": {"name": "Wekelijkse rijscore"},
+      "weekly_consumption": {"name": "Wekelijks stroomverbruik"},
+      "weekly_points": {"name": "Wekelijkse punten"},
+      "monthly_drive_score": {"name": "Maandelijkse rijscore"},
+      "monthly_consumption": {"name": "Maandelijks stroomverbruik"},
+      "monthly_points": {"name": "Maandelijkse punten"}
+    },
+    "event": {
+      "points_awarded": {"name": "Toegekende punten", "state_attributes": {"points": {"name": "Punten"}, "occurred_at": {"name": "Tijdstip"}}}
+    },
+    "button": {
+      "refresh_points_history": {"name": "Puntengeschiedenis opnieuw ophalen"}
+    }
+  }
+}

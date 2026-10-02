@@ -1,0 +1,29 @@
+get_points_history:
+  name: Get point history
+  description: Return a page of locally stored Eco Coach point awards without trip details.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Select the Eco Coach config entry to read.
+      required: true
+      example: "example-entry-id"
+      selector:
+        config_entry:
+          integration: mbecocoach
+    offset:
+      name: Offset
+      description: Number of awards to skip, newest first.
+      example: 0
+      selector:
+        number:
+          min: 0
+          mode: box
+    limit:
+      name: Limit
+      description: Number of awards to return (1 to 100).
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box

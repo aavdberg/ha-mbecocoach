@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/aavdberg/ha-mbecocoach/discussions
+    about: Ask questions and discuss Eco Coach integration research. Do not share credentials or VINs.
+  - name: Home Assistant integration documentation
+    url: https://developers.home-assistant.io/docs/creating_integration_file_structure/
+    about: Reference documentation for custom integrations.
