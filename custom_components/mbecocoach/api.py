@@ -163,6 +163,10 @@ class EcoCoachClient:
         self._token = token
         self._timezone = timezone
 
+    def set_token(self, token: str) -> None:
+        """Apply a rotated access token before the next request."""
+        self._token = token
+
     async def async_personal_statistics(self, vin: str) -> PersonalStatistics:
         """Fetch personal statistics for one vehicle."""
         url = f"{BASE_URL}/api/v5/{vin}/statistics/personal"

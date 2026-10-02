@@ -3,21 +3,26 @@
     "step": {
       "user": {
         "title": "Mercedes Eco Coach",
-        "description": "Enter your VIN and an existing Eco Coach bearer token. Automatic login and token refresh are not yet supported.",
+        "description": "Enter your VIN. Leave the token blank to sign in via Mercedes in a desktop browser. Alternatively enter an existing access token.",
         "data": {"vin": "Vehicle identification number (VIN)", "token": "Bearer token"}
+      },
+      "callback": {
+        "title": "Complete Mercedes sign-in",
+        "description": "Open this URL in a desktop browser (not on your phone): {authorization_url}\n\nSign in, then copy the COMPLETE `ecocoach://login/callback?...` URL from the browser's address bar when it cannot open the Eco Coach app. Paste it below within 10 minutes. The callback URL contains a one-time code: never share it.",
+        "data": {"callback_url": "Complete callback URL"}
       },
       "reauth_confirm": {
         "title": "Renew Eco Coach token",
-        "description": "Enter a new Eco Coach bearer token for this VIN.",
+        "description": "Leave the token empty to start a new browser login, or enter a replacement bearer token.",
         "data": {"token": "Bearer token"}
       }
     },
     "error": {
       "invalid_vin": "Enter a valid 17-character VIN.",
       "invalid_token": "Enter a non-empty token.",
-      "invalid_auth": "The token was rejected or has expired.",
-      "cannot_connect": "The Eco Coach statistics server could not be reached.",
-      "invalid_response": "The statistics server returned an unsupported response."
+      "invalid_auth": "Mercedes rejected the authorization, or the callback was invalid or expired. Start a new login if needed.",
+      "cannot_connect": "The Mercedes login or Eco Coach statistics server could not be reached.",
+      "invalid_response": "The login or statistics server returned an unsupported response."
     },
     "abort": {
       "already_configured": "This VIN is already configured.",

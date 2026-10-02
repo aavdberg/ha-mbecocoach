@@ -18,7 +18,7 @@ type EcoCoachConfigEntry = ConfigEntry[EcoCoachCoordinator]
 async def async_setup_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> bool:
     """Set up statistics for a configured VIN."""
     client = EcoCoachClient(async_get_clientsession(hass), entry.data[CONF_TOKEN], ZoneInfo(hass.config.time_zone))
-    coordinator = EcoCoachCoordinator(hass, client, entry.data[CONF_VIN])
+    coordinator = EcoCoachCoordinator(hass, client, entry.data[CONF_VIN], entry)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])

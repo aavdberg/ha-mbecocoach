@@ -12,14 +12,15 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from .api import EcoCoachAuthError, EcoCoachClient, EcoCoachConnectionError, EcoCoachError
-from .const import CONF_TOKEN, CONF_VIN, DOMAIN
+from .const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, CONF_VIN, DOMAIN
+from .oauth import OAuthAttempt, exchange_code
 
 VIN_PATTERN = re.compile(r"[A-HJ-NPR-Z0-9]{17}\Z")
 TOKEN_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
 
 
 class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Collect VIN and an existing bearer token."""
+    """Authorize Eco Coach in a desktop browser, or supply an existing token."""
 
     VERSION = 1
 
@@ -28,30 +29,73 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             vin = user_input[CONF_VIN].strip().upper()
-            token = user_input[CONF_TOKEN].strip()
+            token = user_input.get(CONF_TOKEN, "").strip()
             if not VIN_PATTERN.fullmatch(vin):
                 errors[CONF_VIN] = "invalid_vin"
-            elif not token:
-                errors[CONF_TOKEN] = "invalid_token"
             else:
                 await self.async_set_unique_id(vin)
                 self._abort_if_unique_id_configured()
-                try:
-                    await EcoCoachClient(
-                        async_get_clientsession(self.hass), token, ZoneInfo(self.hass.config.time_zone)
-                    ).async_personal_statistics(vin)
-                except EcoCoachAuthError:
-                    errors["base"] = "invalid_auth"
-                except EcoCoachConnectionError:
-                    errors["base"] = "cannot_connect"
-                except EcoCoachError:
-                    errors["base"] = "invalid_response"
+                if token:
+                    try:
+                        await self._verify(vin, token)
+                    except EcoCoachAuthError:
+                        errors["base"] = "invalid_auth"
+                    except EcoCoachConnectionError:
+                        errors["base"] = "cannot_connect"
+                    except EcoCoachError:
+                        errors["base"] = "invalid_response"
+                    else:
+                        data = {CONF_VIN: vin, CONF_TOKEN: token}
+                        return self.async_create_entry(title=f"Eco Coach {vin}", data=data)
                 else:
-                    return self.async_create_entry(title=f"Eco Coach {vin}", data={CONF_VIN: vin, CONF_TOKEN: token})
+                    self._vin = vin
+                    return await self.async_step_authorize()
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({vol.Required(CONF_VIN): str, vol.Required(CONF_TOKEN): TOKEN_SELECTOR}),
+            data_schema=vol.Schema({vol.Required(CONF_VIN): str, vol.Optional(CONF_TOKEN): TOKEN_SELECTOR}),
+            errors=errors,
+        )
+
+    async def _verify(self, vin: str, token: str) -> None:
+        client = EcoCoachClient(async_get_clientsession(self.hass), token, ZoneInfo(self.hass.config.time_zone))
+        await client.async_personal_statistics(vin)
+        await client.async_period_statistics(vin)
+
+    async def async_step_authorize(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
+        """Offer a PKCE URL for a desktop browser; the callback stays in this flow."""
+        self._attempt = OAuthAttempt()
+        return await self.async_step_callback()
+
+    async def async_step_callback(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
+        """Accept only the full callback URL matching this PKCE session."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                tokens = await exchange_code(
+                    async_get_clientsession(self.hass), self._attempt, user_input["callback_url"]
+                )
+                await self._verify(self._vin, tokens.access_token)
+            except EcoCoachAuthError:
+                errors["base"] = "invalid_auth"
+            except EcoCoachConnectionError:
+                errors["base"] = "cannot_connect"
+            except EcoCoachError:
+                errors["base"] = "invalid_response"
+            else:
+                data = {
+                    CONF_VIN: self._vin,
+                    CONF_TOKEN: tokens.access_token,
+                    CONF_REFRESH_TOKEN: tokens.refresh_token,
+                    CONF_EXPIRES_AT: tokens.expires_at,
+                }
+                if hasattr(self, "_reauth_entry"):
+                    return self.async_update_reload_and_abort(self._reauth_entry, data=data)
+                return self.async_create_entry(title=f"Eco Coach {self._vin}", data=data)
+        return self.async_show_form(
+            step_id="callback",
+            data_schema=vol.Schema({vol.Required("callback_url"): TOKEN_SELECTOR}),
+            description_placeholders={"authorization_url": self._attempt.url},
             errors=errors,
         )
 
@@ -66,14 +110,13 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Check and save a new token."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            token = user_input[CONF_TOKEN].strip()
+            token = user_input.get(CONF_TOKEN, "").strip()
             if not token:
-                errors["base"] = "invalid_auth"
+                self._vin = self._reauth_entry.data[CONF_VIN]
+                return await self.async_step_authorize()
             else:
                 try:
-                    await EcoCoachClient(
-                        async_get_clientsession(self.hass), token, ZoneInfo(self.hass.config.time_zone)
-                    ).async_personal_statistics(self._reauth_entry.data[CONF_VIN])
+                    await self._verify(self._reauth_entry.data[CONF_VIN], token)
                 except EcoCoachAuthError:
                     errors["base"] = "invalid_auth"
                 except EcoCoachConnectionError:
@@ -81,9 +124,12 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 except EcoCoachError:
                     errors["base"] = "invalid_response"
                 else:
-                    return self.async_update_reload_and_abort(self._reauth_entry, data_updates={CONF_TOKEN: token})
+                    return self.async_update_reload_and_abort(
+                        self._reauth_entry,
+                        data_updates={CONF_TOKEN: token, CONF_REFRESH_TOKEN: None, CONF_EXPIRES_AT: None},
+                    )
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_TOKEN): TOKEN_SELECTOR}),
+            data_schema=vol.Schema({vol.Optional(CONF_TOKEN): TOKEN_SELECTOR}),
             errors=errors,
         )

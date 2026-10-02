@@ -3,21 +3,26 @@
     "step": {
       "user": {
         "title": "Mercedes Eco Coach",
-        "description": "Voer je VIN en een bestaand Eco Coach-bearertoken in. Automatisch inloggen en tokenvernieuwing worden nog niet ondersteund.",
+        "description": "Voer je VIN in. Laat het token leeg om in een desktopbrowser bij Mercedes in te loggen. Je kunt ook een bestaand access token invullen.",
         "data": {"vin": "Voertuigidentificatienummer (VIN)", "token": "Bearertoken"}
+      },
+      "callback": {
+        "title": "Mercedes-aanmelding voltooien",
+        "description": "Open deze URL in een desktopbrowser (niet op je telefoon): {authorization_url}\n\nLog in en kopieer de VOLLEDIGE `ecocoach://login/callback?...`-URL uit de adresbalk wanneer de browser de Eco Coach-app niet kan openen. Plak deze binnen 10 minuten hieronder. De URL bevat een eenmalige code: deel deze nooit.",
+        "data": {"callback_url": "Volledige terugkeer-URL"}
       },
       "reauth_confirm": {
         "title": "Eco Coach-token vernieuwen",
-        "description": "Voer een nieuw Eco Coach-bearertoken in voor deze VIN.",
+        "description": "Laat het token leeg om opnieuw via de browser in te loggen, of voer een vervangend bearertoken in.",
         "data": {"token": "Bearertoken"}
       }
     },
     "error": {
       "invalid_vin": "Voer een geldig VIN van 17 tekens in.",
       "invalid_token": "Voer een token in.",
-      "invalid_auth": "Het token is afgewezen of verlopen.",
-      "cannot_connect": "De Eco Coach-statistiekserver is niet bereikbaar.",
-      "invalid_response": "De statistiekserver gaf een onbekend antwoord."
+      "invalid_auth": "Mercedes wees de aanmelding af of de terugkeer-URL is ongeldig of verlopen. Start indien nodig een nieuwe aanmelding.",
+      "cannot_connect": "De Mercedes-aanmelding of Eco Coach-statistiekserver is niet bereikbaar.",
+      "invalid_response": "De aanmeld- of statistiekserver gaf een onbekend antwoord."
     },
     "abort": {
       "already_configured": "Deze VIN is al geconfigureerd.",
