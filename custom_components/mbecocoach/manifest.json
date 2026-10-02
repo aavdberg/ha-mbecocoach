@@ -3,10 +3,11 @@
   "name": "Mercedes Eco Coach",
   "codeowners": ["@aavdberg"],
   "config_flow": true,
+  "dependencies": ["frontend", "http"],
   "documentation": "https://github.com/aavdberg/ha-mbecocoach",
   "integration_type": "device",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/aavdberg/ha-mbecocoach/issues",
   "requirements": [],
-  "version": "0.6.0"
+  "version": "0.7.0"
 }
