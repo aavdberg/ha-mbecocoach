@@ -209,12 +209,15 @@ async def test_points_requests_use_observed_routes_and_bounded_recent_window() -
     assert (await client.async_points()).total == 0
     assert session.get.call_args.args[0].endswith("/api/v5/user/points")
     assert set(session.get.call_args.kwargs["params"]) == {"from"}
+    assert session.get.call_args.kwargs["timeout"] == 15
     response.json.return_value = {"events": []}
     await client.async_awards(VIN)
     assert session.get.call_args.args[0].endswith(f"/api/v5/{VIN}/report")
     assert session.get.call_args.kwargs["params"]["from"] != "2000-01-01T00:00:00Z"
+    assert session.get.call_args.kwargs["timeout"] == 15
     await client.async_awards(VIN, all_history=True)
     assert session.get.call_args.kwargs["params"] == {"from": "2000-01-01T00:00:00Z"}
+    assert session.get.call_args.kwargs["timeout"] == 90
 
 
 def test_latest_award_sensor_has_only_time_attribute() -> None:
