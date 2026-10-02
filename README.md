@@ -4,7 +4,13 @@ Experimental Home Assistant 2026.9 custom integration. Not affiliated with Merce
 
 ## Install and test
 
-Copy `custom_components/mbecocoach` from the **`main` branch** to your Home Assistant `config/custom_components` folder and restart Home Assistant. The test Home Assistant already has the development version installed. Select **Mercedes Eco Coach** under **Settings → Devices & services → Add integration**.
+Until the integration is accepted into HACS's default catalog, add
+`https://github.com/aavdberg/ha-mbecocoach` under **HACS → Custom repositories**
+as an **Integration**, then download Mercedes Eco Coach and restart Home
+Assistant. HACS listing approval is separate from this release and may take
+time; the repository is not yet searchable as a default integration.
+
+Alternatively, copy `custom_components/mbecocoach` from the **`main` branch** to your Home Assistant `config/custom_components` folder and restart Home Assistant. The test Home Assistant already has the development version installed. Select **Mercedes Eco Coach** under **Settings → Devices & services → Add integration**.
 
 Enter your 17-character VIN and **leave the optional bearer token blank** to try browser-assisted Mercedes login:
 
