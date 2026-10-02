@@ -307,6 +307,7 @@ class EcoCoachCard extends HTMLElement {
     this._lastHistoryFetch = 0;
     this._refreshing = false;
     this._refreshError = false;
+    this._pendingFocusKey = null;
   }
 
   static getConfigElement() {
@@ -372,6 +373,7 @@ class EcoCoachCard extends HTMLElement {
     this._history = { total: 0, offset: 0, awards: [] };
     this._historyOffset = 0;
     this._lastHistoryFetch = 0;
+    this._pendingFocusKey = null;
   }
 
   async _loadRegistry(force = false) {
@@ -517,6 +519,8 @@ class EcoCoachCard extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot) return;
+    const active = this.shadowRoot.activeElement;
+    const focusKey = active?.dataset?.focusKey || this._pendingFocusKey;
     const language = this._language();
     const labels = TEXT[language];
     const style = document.createElement("style");
@@ -541,6 +545,7 @@ class EcoCoachCard extends HTMLElement {
     const refresh = document.createElement("button");
     refresh.className = "refresh";
     refresh.type = "button";
+    refresh.dataset.focusKey = "reimport";
     refresh.textContent = this._refreshing ? labels.refreshing : labels.refresh;
     refresh.disabled = this._refreshing || this._historyLoading || this._registryLoading;
     refresh.addEventListener("click", () => this._refresh());
@@ -550,7 +555,7 @@ class EcoCoachCard extends HTMLElement {
     const hero = document.createElement("button");
     hero.className = "hero clickable";
     hero.type = "button";
-    hero.setAttribute("aria-label", `${labels.total}. ${labels.viewAwards}`);
+    hero.dataset.focusKey = "hero";
     hero.style.width = "100%";
     hero.addEventListener("click", () => this.shadowRoot.querySelector("#eco-coach-history")?.scrollIntoView({
       behavior: "smooth", block: "start",
@@ -594,6 +599,7 @@ class EcoCoachCard extends HTMLElement {
       const tile = document.createElement("button");
       tile.className = "tile clickable";
       tile.type = "button";
+      tile.dataset.focusKey = `tile:${this._related[suffix]}`;
       tile.addEventListener("click", () => this._moreInfo(this._related[suffix]));
       const label = document.createElement("div");
       label.className = "tile-label";
@@ -620,6 +626,7 @@ class EcoCoachCard extends HTMLElement {
         const tile = document.createElement("button");
         tile.className = "tile clickable";
         tile.type = "button";
+        tile.dataset.focusKey = `tile:${entityId}`;
         tile.addEventListener("click", () => this._moreInfo(entityId));
         const label = document.createElement("div");
         label.className = "tile-label";
@@ -650,6 +657,7 @@ class EcoCoachCard extends HTMLElement {
 
     const historySection = this._section(content, labels.history);
     historySection.id = "eco-coach-history";
+    historySection.querySelector("h3").tabIndex = -1;
     if (this._historyError) {
       this._appendMessage(historySection, this._refreshError ? labels.refreshError : labels.historyError, true);
       if (!this._refreshError) {
@@ -657,6 +665,7 @@ class EcoCoachCard extends HTMLElement {
         retry.type = "button";
         retry.className = "refresh";
         retry.textContent = labels.retry;
+        retry.dataset.focusKey = "retry";
         retry.addEventListener("click", () => this._fetchHistory());
         historySection.append(retry);
       }
@@ -697,6 +706,7 @@ class EcoCoachCard extends HTMLElement {
       const previous = document.createElement("button");
       previous.type = "button";
       previous.textContent = labels.previous;
+      previous.dataset.focusKey = "page:previous";
       previous.disabled = this._historyLoading || this._historyOffset === 0;
       previous.addEventListener("click", () => this._fetchHistory(false, Math.max(0, this._historyOffset - HISTORY_PAGE_SIZE)));
       const range = document.createElement("span");
@@ -706,6 +716,7 @@ class EcoCoachCard extends HTMLElement {
       const next = document.createElement("button");
       next.type = "button";
       next.textContent = labels.next;
+      next.dataset.focusKey = "page:next";
       next.disabled = this._historyLoading || !this._history.awards.length
         || this._historyOffset + this._history.awards.length >= this._history.total;
       next.addEventListener("click", () => this._fetchHistory(false, this._historyOffset + this._history.awards.length));
@@ -715,6 +726,21 @@ class EcoCoachCard extends HTMLElement {
 
     card.append(content);
     this.shadowRoot.replaceChildren(style, card);
+    if (active && focusKey) {
+      const controls = [...this.shadowRoot.querySelectorAll("[data-focus-key]")];
+      const target = controls.find((control) => control.dataset.focusKey === focusKey && !control.disabled);
+      if (target) {
+        target.focus();
+        this._pendingFocusKey = null;
+      } else if (focusKey.startsWith("page:")) {
+        this._pendingFocusKey = this._historyLoading ? focusKey : null;
+        const fallback = this._historyLoading ? null : controls.find((control) =>
+          control.dataset.focusKey.startsWith("page:") && !control.disabled);
+        (fallback || historySection.querySelector("h3")).focus();
+      } else {
+        this._pendingFocusKey = null;
+      }
+    }
   }
 }
 
