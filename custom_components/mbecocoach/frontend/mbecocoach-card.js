@@ -466,12 +466,14 @@ class EcoCoachCard extends HTMLElement {
       if (!this._entryId || !this._related.refresh_points_history) {
         await this._loadRegistry(true);
       }
-      if (!this._entryId || !this._related.refresh_points_history) {
+      const buttonId = this._related.refresh_points_history;
+      const button = this._state(buttonId);
+      if (!this._entryId || !button || button.state === "unavailable") {
         this._refreshError = "unavailable";
         return;
       }
       await this._hass.callService("button", "press", {
-        entity_id: this._related.refresh_points_history,
+        entity_id: buttonId,
       }, undefined, false);
       await this._fetchHistory(true);
     } catch (_error) {

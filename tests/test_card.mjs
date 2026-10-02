@@ -271,14 +271,17 @@ test("failed remote re-import retains cached awards without fetching another pag
   card._historyError = false;
   card._entryId = "entry-a";
   card._related = { refresh_points_history: "button.fixture_history" };
-  card._hass = { callService: async (domain, service, data, target, notifyOnError) => {
+  card._hass = {
+    states: { "button.fixture_history": { state: "2026-10-01T00:00:00Z" } },
+    callService: async (domain, service, data, target, notifyOnError) => {
     assert.equal(domain, "button");
     assert.equal(service, "press");
     assert.equal(data.entity_id, "button.fixture_history");
     assert.equal(target, undefined);
     assert.equal(notifyOnError, false);
     throw new Error("Connection failed");
-  } };
+    },
+  };
   card._render = () => {};
   card._fetchHistory = () => { throw new Error("History must not be refetched after failure"); };
   await card._refresh();
@@ -299,6 +302,22 @@ test("missing history button shows availability error without claiming a network
   card._render = () => {};
   card._loadRegistry = async () => {};
   card._hass = { callService: () => { throw new Error("Should not call the button"); } };
+  await card._refresh();
+  assert.equal(card._refreshError, "unavailable");
+  assert.equal(card._historyError, false);
+});
+
+test("disabled history button is unavailable even if its registry record remains", async () => {
+  const Card = definitions.get("mbecocoach-card");
+  const card = Object.create(Card.prototype);
+  card._entryId = "entry-a";
+  card._related = { refresh_points_history: "button.fixture_history" };
+  card._historyError = false;
+  card._render = () => {};
+  card._hass = {
+    states: {},
+    callService: () => { throw new Error("Must not press disabled button"); },
+  };
   await card._refresh();
   assert.equal(card._refreshError, "unavailable");
   assert.equal(card._historyError, false);
