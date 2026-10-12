@@ -45,7 +45,7 @@ def test_first_beta_and_numeric_increment() -> None:
     tags = {
         "v0.8.0-beta.9": OLD_SHA,
         "v0.8.0-beta.10": OLD_SHA,
-        "v0.9.0-beta.99": OLD_SHA,
+        "v0.7.0-beta.99": OLD_SHA,
         "v0.8.0-beta.bad": OLD_SHA,
         "v0.8.0-dev.20261012": OLD_SHA,
     }
@@ -65,6 +65,18 @@ def test_already_stable_beta_is_skipped() -> None:
 def test_stable_downgrade_is_rejected(beta: bool) -> None:
     with pytest.raises(ValueError, match="older"):
         release.plan_release("0.7.4", {"v0.7.5": OLD_SHA}, SHA, beta=beta)
+
+
+@pytest.mark.parametrize("beta", [False, True])
+def test_beta_base_version_downgrade_is_rejected(beta: bool) -> None:
+    with pytest.raises(ValueError, match="older"):
+        release.plan_release("0.8.0", {"v0.9.0-beta.1": OLD_SHA}, SHA, beta=beta)
+
+
+def test_existing_stable_remains_idempotent_after_new_development_betas() -> None:
+    assert release.plan_release(
+        "0.7.5", {"v0.7.5": OLD_SHA, "v0.8.0-beta.1": SHA}, SHA, beta=False
+    ) == release.ReleasePlan("v0.7.5", OLD_SHA, False, False)
 
 
 def test_new_stable_tag_and_existing_immutable_tag() -> None:
@@ -240,3 +252,4 @@ def test_review_request_never_executes_pr_code() -> None:
     assert job["permissions"] == {"pull-requests": "write"}
     assert "head.repo.full_name == github.repository" in job["if"]
     assert all(step.get("uses") == "actions/github-script@v7" for step in job["steps"])
+    assert "reviewers: ['copilot-pull-request-reviewer[bot]']" in job["steps"][0]["with"]["script"]

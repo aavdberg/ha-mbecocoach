@@ -55,6 +55,6 @@ Levels, challenges, duels, full trip history, reports, coach messages, services 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the PR-to-`dev` strategy, Copilot
 review gates, beta/stable release process and automation prerequisites.
 
-Create a detailed English issue for each feature or bug. Run `ruff check custom_components tests`, `ruff format --check custom_components tests` and `python -m pytest -q`. GitHub CI also runs hassfest, HACS validation and secret scanning. Never commit tokens, callback URLs, VINs, real trip data or raw captures. Promote `dev` to `main` only when explicitly requested.
+Create a detailed English issue for each feature or bug. Run `python -m ruff check custom_components tests .github/scripts`, `python -m ruff format --check custom_components tests .github/scripts`, `python -m pytest -q` and `node --test tests/*.mjs`. GitHub CI also runs hassfest, HACS validation and secret scanning. Never commit tokens, callback URLs, VINs, real trip data or raw captures. Promote `dev` to `main` only when explicitly requested.
 
 For private test-HA troubleshooting, set `logger: {logs: {custom_components.mbecocoach: debug}}` in Home Assistant configuration and restart. Debug messages record only fixed login-stage names, statistics endpoint names (`personal` or `all`) and numeric HTTP status codes; never publish full HA logs or enable HTTP client wire logging, which can expose authorization material. Remove the temporary debug setting when troubleshooting is finished.

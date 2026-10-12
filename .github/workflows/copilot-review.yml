@@ -24,6 +24,6 @@ jobs:
             await github.rest.pulls.requestReviewers({
               ...context.repo,
               pull_number: context.payload.pull_request.number,
-              reviewers: ['Copilot'],
+              reviewers: ['copilot-pull-request-reviewer[bot]'],
             });
             core.notice('Review requested; wait for an actually submitted review before merging.');

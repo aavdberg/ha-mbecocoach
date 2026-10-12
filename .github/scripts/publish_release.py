@@ -26,16 +26,20 @@ class ReleasePlan:
 
 
 def plan_release(version: str, tags: dict[str, str], sha: str, *, beta: bool) -> ReleasePlan | None:
-    """Reuse same-commit betas, reject downgrades and never move stable tags."""
+    """Reuse tags, reject lower new versions across channels and never move tags."""
     if not re.fullmatch(VERSION, version):
         raise ValueError("Manifest version must be plain X.Y.Z without leading zeros")
     current = tuple(map(int, version.split(".")))
-    stable_versions = [tuple(map(int, match.groups())) for tag in tags if (match := STABLE.fullmatch(tag))]
-    if stable_versions and current < max(stable_versions):
-        raise ValueError("Manifest version is older than an existing stable release")
     stable_tag = f"v{version}"
+    if not beta and stable_tag in tags:
+        return ReleasePlan(stable_tag, tags[stable_tag], False, False)
+    published_versions = [
+        tuple(map(int, match.groups()[:3])) for tag in tags if (match := STABLE.fullmatch(tag) or BETA.fullmatch(tag))
+    ]
+    if published_versions and current < max(published_versions):
+        raise ValueError("Manifest version is older than an existing stable or beta release")
     if not beta:
-        return ReleasePlan(stable_tag, tags.get(stable_tag, sha), False, stable_tag not in tags)
+        return ReleasePlan(stable_tag, sha, False, True)
     if stable_tag in tags:
         return None
     numbers: list[int] = []
