@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .api import (
+    DriveDetails,
     EcoCoachError,
     PointsAward,
     drive_details_to_storage,
@@ -79,8 +80,33 @@ class PointsHistory:
         updates = {}
         for award in awards:
             existing = self._awards.get(award.id)
-            if existing is not None and existing.drive_details is not None and award.drive_details is None:
-                award = PointsAward(award.id, award.category, award.points, award.occurred_at, existing.drive_details)
+            if existing is not None:
+                old_details = existing.drive_details
+                new_details = award.drive_details
+                if old_details is not None and new_details is not None:
+                    details = DriveDetails(
+                        new_details.drive_score if new_details.drive_score is not None else old_details.drive_score,
+                        new_details.distance_km if new_details.distance_km is not None else old_details.distance_km,
+                        new_details.electric_consumption
+                        if new_details.electric_consumption is not None
+                        else old_details.electric_consumption,
+                        new_details.co2_emissions_kg
+                        if new_details.co2_emissions_kg is not None
+                        else old_details.co2_emissions_kg,
+                        new_details.duration_seconds
+                        if new_details.duration_seconds is not None
+                        else old_details.duration_seconds,
+                        new_details.start_time if new_details.start_time is not None else old_details.start_time,
+                        new_details.temperature_c
+                        if new_details.temperature_c is not None
+                        else old_details.temperature_c,
+                        new_details.battery_percent_change
+                        if new_details.battery_percent_change is not None
+                        else old_details.battery_percent_change,
+                    )
+                else:
+                    details = new_details or old_details
+                award = PointsAward(award.id, award.category, award.points, award.occurred_at, details)
             if existing != award:
                 updates[award.id] = award
         if updates:

@@ -280,6 +280,57 @@ test("renders the confirmed location-free driving summary in Dutch", () => {
   }
 });
 
+test("preserves expanded trip details across card rerenders", () => {
+  class Element {
+    constructor(tag) {
+      this.tag = tag;
+      this.children = [];
+      this.dataset = {};
+      this.attributes = {};
+      this.listeners = new Map();
+      this.classList = { add() {} };
+    }
+    append(...children) { this.children.push(...children); }
+    addEventListener(type, listener) { this.listeners.set(type, listener); }
+    setAttribute(name, value) { this.attributes[name] = value; }
+  }
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: (tag) => new Element(tag) };
+  try {
+    const Card = definitions.get("mbecocoach-card");
+    const card = Object.create(Card.prototype);
+    card._historyOffset = 0;
+    card._hass = { language: "en" };
+    card._openAwardKeys = new Set();
+    card._number = (value) => String(value);
+    card._appendDriveDetails = () => {};
+    const award = {
+      category: "driving",
+      points: 42,
+      occurred_at: "2026-10-01T12:00:00Z",
+      drive_details: { drive_score: 88 },
+    };
+    const create = () => card._createAwardItem(
+      award,
+      0,
+      new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }),
+      cardModule.TEXT.en,
+      "en",
+    );
+    const first = create();
+    assert.equal(first.open, false);
+    first.open = true;
+    first.listeners.get("toggle")();
+    assert.equal(create().open, true);
+    const rerendered = create();
+    rerendered.open = false;
+    rerendered.listeners.get("toggle")();
+    assert.equal(create().open, false);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
 test("requests history through the sixth callService argument and reads the response envelope", async () => {
   const Card = definitions.get("mbecocoach-card");
   const card = Object.create(Card.prototype);
