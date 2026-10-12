@@ -409,6 +409,7 @@ class EcoCoachCard extends HTMLElement {
     this._refreshing = false;
     this._refreshError = false;
     this._pendingFocusKey = null;
+    this._openAwardKeys = new Set();
   }
 
   static getConfigElement() {
@@ -473,6 +474,7 @@ class EcoCoachCard extends HTMLElement {
     this._historyError = false;
     this._history = { total: 0, offset: 0, awards: [] };
     this._historyOffset = 0;
+    this._openAwardKeys.clear();
     this._lastHistoryFetch = 0;
     this._refreshError = false;
     this._pendingFocusKey = null;
@@ -623,6 +625,58 @@ class EcoCoachCard extends HTMLElement {
     section.append(heading);
     parent.append(section);
     return section;
+  }
+
+  _createAwardItem(award, index, dateFormatter, labels, language) {
+    const row = document.createElement(award.drive_details ? "summary" : "div");
+    row.className = "award";
+    if (award.drive_details) row.dataset.focusKey = `award:${this._historyOffset + index}`;
+    const dot = document.createElement("div");
+    dot.className = "dot";
+    dot.setAttribute("aria-hidden", "true");
+    dot.textContent = (labels[award.category] || award.category).slice(0, 1).toLocaleUpperCase(language);
+    const detail = document.createElement("div");
+    const name = document.createElement("div");
+    name.className = "award-name";
+    name.textContent = labels[award.category] || award.category;
+    const date = document.createElement("div");
+    date.className = "award-date";
+    date.textContent = dateFormatter.format(new Date(award.occurred_at));
+    detail.append(name, date);
+    const points = document.createElement("div");
+    points.className = "award-points";
+    points.textContent = `+${this._number(award.points)}`;
+    const trailing = document.createElement("div");
+    trailing.className = "award-trailing";
+    trailing.append(points);
+    const item = document.createElement(award.drive_details ? "details" : "div");
+    item.className = "award-item";
+    if (award.drive_details) {
+      const key = `${award.category}:${award.occurred_at}:${award.points}`;
+      item.open = this._openAwardKeys.has(key);
+      item.addEventListener("toggle", () => {
+        if (item.open) this._openAwardKeys.add(key);
+        else this._openAwardKeys.delete(key);
+      });
+      row.classList.add("award-summary");
+      row.setAttribute(
+        "aria-label",
+        `${labels.tripDetails}: ${labels[award.category]} ${dateFormatter.format(new Date(award.occurred_at))}`,
+      );
+      const chevron = document.createElement("span");
+      chevron.className = "award-chevron";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.textContent = "⌄";
+      trailing.append(chevron);
+    }
+    row.append(dot, detail, trailing);
+    if (award.drive_details) {
+      item.append(row);
+      this._appendDriveDetails(item, award.drive_details, labels);
+    } else {
+      item.append(row);
+    }
+    return item;
   }
 
   _render() {
@@ -791,49 +845,7 @@ class EcoCoachCard extends HTMLElement {
         timeStyle: "short",
       });
       for (const [index, award] of this._history.awards.entries()) {
-        const row = document.createElement(award.drive_details ? "summary" : "div");
-        row.className = "award";
-        if (award.drive_details) row.dataset.focusKey = `award:${this._historyOffset + index}`;
-        const dot = document.createElement("div");
-        dot.className = "dot";
-        dot.setAttribute("aria-hidden", "true");
-        dot.textContent = (labels[award.category] || award.category).slice(0, 1).toLocaleUpperCase(language);
-        const detail = document.createElement("div");
-        const name = document.createElement("div");
-        name.className = "award-name";
-        name.textContent = labels[award.category] || award.category;
-        const date = document.createElement("div");
-        date.className = "award-date";
-        date.textContent = dateFormatter.format(new Date(award.occurred_at));
-        detail.append(name, date);
-        const points = document.createElement("div");
-        points.className = "award-points";
-        points.textContent = `+${this._number(award.points)}`;
-        const trailing = document.createElement("div");
-        trailing.className = "award-trailing";
-        trailing.append(points);
-        const item = document.createElement(award.drive_details ? "details" : "div");
-        item.className = "award-item";
-        if (award.drive_details) {
-          row.classList.add("award-summary");
-          row.setAttribute(
-            "aria-label",
-            `${labels.tripDetails}: ${labels[award.category]} ${dateFormatter.format(new Date(award.occurred_at))}`,
-          );
-          const chevron = document.createElement("span");
-          chevron.className = "award-chevron";
-          chevron.setAttribute("aria-hidden", "true");
-          chevron.textContent = "⌄";
-          trailing.append(chevron);
-        }
-        row.append(dot, detail, trailing);
-        if (award.drive_details) {
-          item.append(row);
-          this._appendDriveDetails(item, award.drive_details, labels);
-        } else {
-          item.append(row);
-        }
-        awards.append(item);
+        awards.append(this._createAwardItem(award, index, dateFormatter, labels, language));
       }
       historySection.append(awards);
       const paging = document.createElement("div");

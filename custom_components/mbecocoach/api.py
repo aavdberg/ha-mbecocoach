@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, tzinfo
 from typing import Any
@@ -149,18 +150,42 @@ def _event_timestamp(event: dict[str, Any], key: str, field: str) -> datetime | 
     return timestamp
 
 
+def _optional_drive_value[T](field: str, read: Callable[[], T]) -> T | None:
+    """Ignore malformed optional details without rejecting a valid driving award."""
+    try:
+        return read()
+    except EcoCoachError:
+        _LOGGER.warning("Ignoring invalid optional driving detail field %s", field)
+        return None
+
+
 def parse_drive_details(event: dict[str, Any]) -> DriveDetails | None:
     """Extract only confirmed trip summary values; discard route, hints and messages."""
-    drive_score = _number(event.get("driveScore"), "driveScore")
-    if drive_score is not None and not 0 <= drive_score <= 100:
-        raise EcoCoachError("Points report field driveScore is out of range")
-    distance_km = _event_number(event, "distanceTraveled", "distanceTraveled", "KM")
-    electric_consumption = _event_number(event, "electricConsumption", "electricConsumption", "KWH100KM")
-    co2_emissions_kg = _event_number(event, "co2Emissions", "co2Emissions", "KG")
-    duration_seconds = _event_integer(event, "durationInSec", "durationInSec", 0, 86_400)
-    start_time = _event_timestamp(event, "startTime", "startTime")
-    temperature = _event_number(event, "temperatureAvg", "temperatureAvg", "CELSIUS", nonnegative=False)
-    battery_change = _event_integer(event, "socDiff", "socDiff", -100, 100)
+
+    def score() -> float | None:
+        value = _number(event.get("driveScore"), "driveScore")
+        if value is not None and not 0 <= value <= 100:
+            raise EcoCoachError("Points report field driveScore is out of range")
+        return value
+
+    drive_score = _optional_drive_value("driveScore", score)
+    distance_km = _optional_drive_value(
+        "distanceTraveled", lambda: _event_number(event, "distanceTraveled", "distanceTraveled", "KM")
+    )
+    electric_consumption = _optional_drive_value(
+        "electricConsumption", lambda: _event_number(event, "electricConsumption", "electricConsumption", "KWH100KM")
+    )
+    co2_emissions_kg = _optional_drive_value(
+        "co2Emissions", lambda: _event_number(event, "co2Emissions", "co2Emissions", "KG")
+    )
+    duration_seconds = _optional_drive_value(
+        "durationInSec", lambda: _event_integer(event, "durationInSec", "durationInSec", 0, 86_400)
+    )
+    start_time = _optional_drive_value("startTime", lambda: _event_timestamp(event, "startTime", "startTime"))
+    temperature = _optional_drive_value(
+        "temperatureAvg", lambda: _event_number(event, "temperatureAvg", "temperatureAvg", "CELSIUS", nonnegative=False)
+    )
+    battery_change = _optional_drive_value("socDiff", lambda: _event_integer(event, "socDiff", "socDiff", -100, 100))
     details = DriveDetails(
         drive_score,
         distance_km,
