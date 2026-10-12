@@ -65,4 +65,13 @@ confirmed. For problems or feature requests, use
 [GitHub Issues](https://github.com/aavdberg/ha-mbecocoach/issues) without
 including credentials, callback URLs, VINs, raw logs or private trip data.
 
+## Development
+
 Development happens on `dev`; published releases come from `main`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the PR-to-`dev` strategy, Copilot
+review gates, beta/stable release process and automation prerequisites.
+
+Run `python -m ruff check custom_components tests .github/scripts`,
+`python -m ruff format --check custom_components tests .github/scripts`,
+`python -m pytest -q` and `node --test tests/*.mjs`.
+Promote `dev` to `main` only when explicitly requested.
