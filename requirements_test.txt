@@ -4,3 +4,4 @@ aiohttp>=3.9
 voluptuous>=0.13
 ruff>=0.13
 homeassistant==2026.9.0
+PyYAML>=6.0
