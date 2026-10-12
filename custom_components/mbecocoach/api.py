@@ -52,7 +52,7 @@ class PeriodStatistics:
 
 @dataclass(frozen=True)
 class EcoCoachData:
-    """Only summary metrics; no trip, message, or account details."""
+    """Summary metrics and whitelisted history; no route, message, or account details."""
 
     personal: PersonalStatistics
     daily: PeriodStatistics
@@ -71,13 +71,28 @@ class PointsSummary:
 
 
 @dataclass(frozen=True)
+class DriveDetails:
+    """A private, location-free summary of one confirmed driving report event."""
+
+    drive_score: float | None
+    distance_km: float | None
+    electric_consumption: float | None
+    co2_emissions_kg: float | None
+    duration_seconds: int | None
+    start_time: datetime | None
+    temperature_c: float | None
+    battery_percent_change: int | None
+
+
+@dataclass(frozen=True)
 class PointsAward:
-    """Minimal award metadata used only for new HA event history."""
+    """Award metadata and optional location-free driving summary."""
 
     id: str
     category: str
     points: int
     occurred_at: datetime
+    drive_details: DriveDetails | None = None
 
 
 _POINT_CATEGORIES = frozenset({"DRIVING", "CHARGING", "PARKING", "PERSONAL_CHALLENGE"})
@@ -89,6 +104,159 @@ def _points(value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise EcoCoachError("Points response contains invalid points")
     return value
+
+
+def _event_number(
+    event: dict[str, Any], key: str, field: str, unit: str | None = None, *, nonnegative: bool = True
+) -> float | None:
+    """Read a confirmed optional numeric field from a report event."""
+    value = event.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise EcoCoachError(f"Points report field {field} is invalid")
+    if unit is not None and value.get("unit") != unit:
+        raise EcoCoachError(f"Points report field {field} has an unsupported unit")
+    number = _number(value.get("value"), field)
+    if nonnegative and number is not None and number < 0:
+        raise EcoCoachError(f"Points report field {field} is negative")
+    return number
+
+
+def _event_integer(event: dict[str, Any], key: str, field: str, minimum: int, maximum: int) -> int | None:
+    """Read a bounded whole-number report field."""
+    value = event.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
+        raise EcoCoachError(f"Points report field {field} is invalid")
+    return value
+
+
+def _event_timestamp(event: dict[str, Any], key: str, field: str) -> datetime | None:
+    """Read an optional timezone-aware report timestamp."""
+    value = event.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise EcoCoachError(f"Points report field {field} is invalid")
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as err:
+        raise EcoCoachError(f"Points report field {field} is invalid") from err
+    if timestamp.tzinfo is None:
+        raise EcoCoachError(f"Points report field {field} has no timezone")
+    return timestamp
+
+
+def parse_drive_details(event: dict[str, Any]) -> DriveDetails | None:
+    """Extract only confirmed trip summary values; discard route, hints and messages."""
+    drive_score = _number(event.get("driveScore"), "driveScore")
+    if drive_score is not None and not 0 <= drive_score <= 100:
+        raise EcoCoachError("Points report field driveScore is out of range")
+    distance_km = _event_number(event, "distanceTraveled", "distanceTraveled", "KM")
+    electric_consumption = _event_number(event, "electricConsumption", "electricConsumption", "KWH100KM")
+    co2_emissions_kg = _event_number(event, "co2Emissions", "co2Emissions", "KG")
+    duration_seconds = _event_integer(event, "durationInSec", "durationInSec", 0, 86_400)
+    start_time = _event_timestamp(event, "startTime", "startTime")
+    temperature = _event_number(event, "temperatureAvg", "temperatureAvg", "CELSIUS", nonnegative=False)
+    battery_change = _event_integer(event, "socDiff", "socDiff", -100, 100)
+    details = DriveDetails(
+        drive_score,
+        distance_km,
+        electric_consumption,
+        co2_emissions_kg,
+        duration_seconds,
+        start_time,
+        temperature,
+        battery_change,
+    )
+    return (
+        details
+        if any(
+            value is not None
+            for value in (
+                drive_score,
+                distance_km,
+                electric_consumption,
+                co2_emissions_kg,
+                duration_seconds,
+                start_time,
+                temperature,
+                battery_change,
+            )
+        )
+        else None
+    )
+
+
+def drive_details_to_storage(details: DriveDetails) -> dict[str, Any]:
+    """Serialize the explicit trip-summary whitelist for private local storage."""
+    return {
+        "drive_score": details.drive_score,
+        "distance_km": details.distance_km,
+        "electric_consumption": details.electric_consumption,
+        "co2_emissions_kg": details.co2_emissions_kg,
+        "duration_seconds": details.duration_seconds,
+        "start_time": details.start_time.isoformat() if details.start_time else None,
+        "temperature_c": details.temperature_c,
+        "battery_percent_change": details.battery_percent_change,
+    }
+
+
+def parse_stored_drive_details(payload: Any) -> DriveDetails:
+    """Validate the local, flattened driving-summary record."""
+    fields = {
+        "drive_score",
+        "distance_km",
+        "electric_consumption",
+        "co2_emissions_kg",
+        "duration_seconds",
+        "start_time",
+        "temperature_c",
+        "battery_percent_change",
+    }
+    if not isinstance(payload, dict) or set(payload) != fields:
+        raise EcoCoachError("Saved points history contains invalid driving details")
+
+    def number(key: str, *, maximum: float | None = None) -> float | None:
+        value = _number(payload[key], key)
+        if value is not None and (value < 0 or (maximum is not None and value > maximum)):
+            raise EcoCoachError(f"Saved points history contains invalid {key}")
+        return value
+
+    duration = payload["duration_seconds"]
+    if duration is not None and (
+        isinstance(duration, bool) or not isinstance(duration, int) or not 0 <= duration <= 86_400
+    ):
+        raise EcoCoachError("Saved points history contains invalid duration_seconds")
+    battery_change = payload["battery_percent_change"]
+    if battery_change is not None and (
+        isinstance(battery_change, bool) or not isinstance(battery_change, int) or not -100 <= battery_change <= 100
+    ):
+        raise EcoCoachError("Saved points history contains invalid battery_percent_change")
+
+    start_time = payload["start_time"]
+    if start_time is not None:
+        if not isinstance(start_time, str):
+            raise EcoCoachError("Saved points history contains invalid start_time")
+        try:
+            start_time = datetime.fromisoformat(start_time)
+        except ValueError as err:
+            raise EcoCoachError("Saved points history contains invalid start_time") from err
+        if start_time.tzinfo is None:
+            raise EcoCoachError("Saved points history contains a start_time without a timezone")
+
+    return DriveDetails(
+        number("drive_score", maximum=100),
+        number("distance_km"),
+        number("electric_consumption"),
+        number("co2_emissions_kg"),
+        duration,
+        start_time,
+        _number(payload["temperature_c"], "temperature_c"),
+        battery_change,
+    )
 
 
 def parse_points(payload: Any) -> PointsSummary:
@@ -108,7 +276,7 @@ def parse_points(payload: Any) -> PointsSummary:
 
 
 def parse_awards(payload: Any) -> tuple[PointsAward, ...]:
-    """Keep only points from supported report events; discard all trip details."""
+    """Keep supported awards and whitelisted drive summaries; discard other report details."""
     if not isinstance(payload, dict) or not isinstance(payload.get("events"), list):
         raise EcoCoachError("Points report response is invalid")
     awards: list[PointsAward] = []
@@ -131,7 +299,8 @@ def parse_awards(payload: Any) -> tuple[PointsAward, ...]:
             raise EcoCoachError("Points report contains an invalid award timestamp") from err
         if timestamp.tzinfo is None:
             raise EcoCoachError("Points report contains an award without a timezone")
-        awards.append(PointsAward(event_id, category, _points(event.get("points")), timestamp))
+        details = parse_drive_details(event) if category == "driving" else None
+        awards.append(PointsAward(event_id, category, _points(event.get("points")), timestamp, details))
         seen.add(event_id)
     return tuple(awards)
 
