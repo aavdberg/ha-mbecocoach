@@ -56,7 +56,8 @@ promote to `main` without an **explicit user release request**.
 ## Releases (only on explicit user request)
 
 - Development prereleases use `v<manifest-version>-beta.N`, not timestamps.
-  The release scripts serialize publication, reuse a tag on retries and wait
+  The release workflows serialize publication with a shared `queue: max` group
+  (up to 100 pending runs), reuse a tag on retries and wait
   for CI, hassfest and secret scanning on the exact trusted branch commit.
 - The manifest contains a plain semantic version (`X.Y.Z`), not a beta suffix.
   Before publishing betas for a new cycle, land a **separate normal PR to dev**

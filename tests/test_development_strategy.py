@@ -228,7 +228,7 @@ def test_required_workflow_coverage_and_target_versions() -> None:
 def test_release_workflows_are_trusted_and_serialized(name: str, branch: str) -> None:
     data = workflow(name)
     assert data["permissions"] == {}
-    assert data["concurrency"] == {"group": "publish-release", "cancel-in-progress": "false"}
+    assert data["concurrency"] == {"group": "publish-release", "queue": "max", "cancel-in-progress": "false"}
     assert set(data["on"]) == {"workflow_run", "workflow_dispatch"}
     assert data["on"]["workflow_run"]["branches"] == [branch]
     assert set(data["on"]["workflow_run"]["workflows"]) == {"CI", "Validate with hassfest", "Secret scan"}

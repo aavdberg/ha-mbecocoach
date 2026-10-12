@@ -35,6 +35,9 @@ scanning, Pre-release publishes `v<manifest-version>-beta.N` from `dev`, and
 Release publishes stable `v<manifest-version>` from `main`. Runs are serialized,
 check the exact SHA and current branch head, never run fork/PR code with a
 publication token, never move tags and recover missing releases on retries.
+Both channels share a `queue: max` concurrency group so new beta triggers do
+not replace a pending stable run. GitHub can queue up to 100 pending runs;
+queue overflow still requires a manual retry after capacity is available.
 Failed or pending validation blocks publication; completion of the last passing
 workflow retries the gate. A manual dispatch on the matching branch can retry
 publication, but fails unless all three push workflows passed that exact SHA.
