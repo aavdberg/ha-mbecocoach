@@ -16,6 +16,8 @@ into Home Assistant. It is not affiliated with Mercedes-Benz.
   Home Assistant action. Historical awards are not replayed as new events.
 - A bundled, theme-aware Eco Coach dashboard card with selectable statistics
   and browsable award history.
+- On `dev`, expandable driving awards with whitelisted, location-free trip
+  summaries; this feature is not yet in published `main` releases.
 
 ## Requirements
 
@@ -45,6 +47,9 @@ starting. Never share your callback URL, password or tokens.
 After setup, choose **Edit dashboard → Add card → Eco Coach**, then select your
 **Total account points** entity. The card is installed with the integration
 but is not automatically added to your dashboards.
+On `dev`, expand a driving award to view its available summary. Routes,
+locations and coaching messages are discarded; see the Wiki for cached
+fields, history re-import and privacy details.
 
 The [Wiki](https://github.com/aavdberg/ha-mbecocoach/wiki) covers:
 [installation](https://github.com/aavdberg/ha-mbecocoach/wiki/Installation),

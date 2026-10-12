@@ -9,6 +9,7 @@ import pytest
 
 from custom_components.mbecocoach import async_unload_entry
 from custom_components.mbecocoach.api import (
+    DriveDetails,
     EcoCoachClient,
     EcoCoachData,
     EcoCoachError,
@@ -81,6 +82,36 @@ def test_report_retains_only_minimal_award_metadata() -> None:
     assert "private message" not in repr(awards)
 
 
+def test_drive_report_keeps_only_confirmed_location_free_summary() -> None:
+    award = parse_awards(
+        {
+            "events": [
+                {
+                    "id": "synthetic-drive",
+                    "type": "DRIVE",
+                    "points": 42,
+                    "createdAt": "2026-01-02T03:04:05Z",
+                    "driveScore": 88,
+                    "distanceTraveled": {"value": 12.4, "unit": "KM"},
+                    "electricConsumption": {"value": 17.8, "unit": "KWH100KM"},
+                    "co2Emissions": {"value": 1.2, "unit": "KG"},
+                    "durationInSec": 645,
+                    "startTime": "2026-01-02T02:53:20Z",
+                    "temperatureAvg": {"value": -3.5, "unit": "CELSIUS"},
+                    "socDiff": -4,
+                    "route": "private route",
+                    "hintDetailsTitle": "private coaching text",
+                }
+            ]
+        }
+    )[0]
+    assert award.drive_details == DriveDetails(
+        88, 12.4, 17.8, 1.2, 645, datetime(2026, 1, 2, 2, 53, 20, tzinfo=UTC), -3.5, -4
+    )
+    assert "private route" not in repr(award)
+    assert "private coaching text" not in repr(award)
+
+
 @pytest.mark.parametrize(
     "event",
     [
@@ -93,6 +124,50 @@ def test_report_retains_only_minimal_award_metadata() -> None:
 def test_report_rejects_invalid_awards(event: dict) -> None:
     with pytest.raises(EcoCoachError):
         parse_awards({"events": [event]})
+
+
+@pytest.mark.parametrize(
+    "details",
+    [
+        {"driveScore": 101},
+        {"distanceTraveled": {"value": -1, "unit": "KM"}},
+        {"electricConsumption": {"value": 10, "unit": "L100KM"}},
+        {"durationInSec": -1},
+        {"startTime": "2026-01-02T02:53:20"},
+        {"temperatureAvg": {"value": 12, "unit": "FAHRENHEIT"}},
+        {"socDiff": 101},
+    ],
+)
+def test_drive_report_ignores_invalid_optional_fields(details: dict) -> None:
+    event = {
+        "id": "synthetic",
+        "type": "DRIVE",
+        "points": 1,
+        "createdAt": "2026-01-02T03:04:05Z",
+        "driveScore": 88,
+        "distanceTraveled": {"value": 12.4, "unit": "KM"},
+        **details,
+    }
+    awards = parse_awards({"events": [event]})
+    assert len(awards) == 1
+    assert awards[0].id == "synthetic"
+    assert awards[0].drive_details is not None
+    assert awards[0].drive_details.distance_km == (None if "distanceTraveled" in details else 12.4)
+    for key in details:
+        if key == "driveScore":
+            assert awards[0].drive_details.drive_score is None
+        elif key == "distanceTraveled":
+            assert awards[0].drive_details.distance_km is None
+        elif key == "electricConsumption":
+            assert awards[0].drive_details.electric_consumption is None
+        elif key == "durationInSec":
+            assert awards[0].drive_details.duration_seconds is None
+        elif key == "startTime":
+            assert awards[0].drive_details.start_time is None
+        elif key == "temperatureAvg":
+            assert awards[0].drive_details.temperature_c is None
+        elif key == "socDiff":
+            assert awards[0].drive_details.battery_percent_change is None
 
 
 @pytest.mark.parametrize(
@@ -177,6 +252,88 @@ async def test_history_is_replaced_and_paginated_without_extra_fields() -> None:
         storage.return_value.async_save.assert_awaited_once()
         await history.async_replace(())
         assert history.count == 0
+
+
+@pytest.mark.asyncio
+async def test_history_enriches_old_drive_awards_and_keeps_details_private() -> None:
+    saved = {
+        "awards": [
+            {
+                "id": "synthetic-drive",
+                "category": "driving",
+                "points": 42,
+                "occurred_at": "2026-01-02T03:04:05+00:00",
+            }
+        ]
+    }
+    details = DriveDetails(88, 12.4, 17.8, None, 645, datetime(2026, 1, 2, 2, 53, 20, tzinfo=UTC), -3.5, -4)
+    award = PointsAward("synthetic-drive", "driving", 42, datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC), details)
+    with patch("custom_components.mbecocoach.points_history.Store") as storage:
+        storage.return_value.async_load = AsyncMock(return_value=saved)
+        storage.return_value.async_save = AsyncMock()
+        history = PointsHistory(MagicMock(), "synthetic-entry")
+        assert await history.async_load()
+        await history.async_merge((award,))
+        storage.return_value.async_save.assert_awaited_once()
+        stored = storage.return_value.async_save.await_args.args[0]["awards"][0]
+        assert stored["drive_details"]["distance_km"] == 12.4
+        assert stored["drive_details"]["start_time"] == "2026-01-02T02:53:20+00:00"
+        page = history.page(0, 1)
+        assert page["awards"][0]["drive_details"]["electric_consumption"] == 17.8
+        assert "id" not in page["awards"][0]
+        assert "route" not in repr(page)
+        await history.async_merge((award,))
+        storage.return_value.async_save.assert_awaited_once()
+        storage.return_value.async_load = AsyncMock(return_value={"awards": [stored]})
+        restored = PointsHistory(MagicMock(), "synthetic-entry")
+        assert await restored.async_load()
+        assert restored.page(0, 1) == page
+
+
+@pytest.mark.asyncio
+async def test_history_merges_partial_drive_details_without_erasing_cached_values() -> None:
+    original = DriveDetails(
+        88,
+        12.4,
+        17.8,
+        1.2,
+        645,
+        datetime(2026, 1, 2, 2, 53, 20, tzinfo=UTC),
+        -3.5,
+        -4,
+    )
+    partial = DriveDetails(None, 15.0, None, None, None, None, None, None)
+    occurred_at = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+    cached = {
+        "awards": [
+            {
+                "id": "synthetic-drive",
+                "category": "driving",
+                "points": 42,
+                "occurred_at": occurred_at.isoformat(),
+                "drive_details": {
+                    "drive_score": original.drive_score,
+                    "distance_km": original.distance_km,
+                    "electric_consumption": original.electric_consumption,
+                    "co2_emissions_kg": original.co2_emissions_kg,
+                    "duration_seconds": original.duration_seconds,
+                    "start_time": original.start_time.isoformat(),
+                    "temperature_c": original.temperature_c,
+                    "battery_percent_change": original.battery_percent_change,
+                },
+            }
+        ]
+    }
+    award = PointsAward("synthetic-drive", "driving", 42, occurred_at, partial)
+    with patch("custom_components.mbecocoach.points_history.Store") as storage:
+        storage.return_value.async_load = AsyncMock(return_value=cached)
+        storage.return_value.async_save = AsyncMock()
+        history = PointsHistory(MagicMock(), "synthetic-entry")
+        assert await history.async_load()
+        await history.async_merge((award,))
+        merged = history.latest("driving")
+        assert merged is not None
+        assert merged.drive_details == DriveDetails(88, 15.0, 17.8, 1.2, 645, original.start_time, -3.5, -4)
 
 
 @pytest.mark.asyncio
