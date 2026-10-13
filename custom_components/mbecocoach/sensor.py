@@ -130,7 +130,7 @@ class EcoCoachSensor(CoordinatorEntity[EcoCoachCoordinator], SensorEntity):
         }
 
     @property
-    def native_value(self) -> float | None:
+    def native_value(self) -> float | str | None:
         """Return the captured metric or unknown when absent."""
         if self.entity_description.key == "account_total_points":
             return self.coordinator.data.points.total if self.coordinator.data.points is not None else None
