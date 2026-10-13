@@ -61,6 +61,26 @@ class EcoCoachData:
     monthly: PeriodStatistics
     points: PointsSummary | None = None
     awards: tuple[PointsAward, ...] = ()
+    report: ReportSummary | None = None
+
+
+@dataclass(frozen=True)
+class ReportSummary:
+    """Optional numeric level fields and counts, never raw challenge details."""
+
+    level_points: float | None
+    current_level: float | None
+    level_progress: float | None
+    community_challenges: int | None
+    competitive_challenges: int | None
+
+
+@dataclass(frozen=True)
+class ReportData:
+    """Whitelisted summaries extracted from a single vehicle report request."""
+
+    awards: tuple[PointsAward, ...]
+    summary: ReportSummary
 
 
 @dataclass(frozen=True)
@@ -339,6 +359,42 @@ def _number(value: Any, field: str) -> float | None:
     return float(value)
 
 
+def parse_report_summary(payload: Any) -> ReportSummary:
+    """Read only captured scalar fields and list lengths without inferring units."""
+    if not isinstance(payload, dict):
+        raise EcoCoachError("Points report response is invalid")
+    level = payload.get("userLevel")
+    if level is not None and not isinstance(level, dict):
+        _LOGGER.warning("Ignoring invalid optional report field userLevel")
+        level = None
+
+    def number(key: str) -> float | None:
+        if level is None:
+            return None
+        try:
+            return _number(level.get(key), key)
+        except EcoCoachError, OverflowError:
+            _LOGGER.warning("Ignoring invalid optional report level field %s", key)
+            return None
+
+    def count(key: str) -> int | None:
+        value = payload.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, list):
+            _LOGGER.warning("Ignoring invalid optional report field %s", key)
+            return None
+        return len(value)
+
+    return ReportSummary(
+        number("points"),
+        number("currentLevel"),
+        number("progress"),
+        count("activeCommunityChallenges"),
+        count("competitiveChallenges"),
+    )
+
+
 def parse_statistics(payload: Any) -> PersonalStatistics:
     """Extract metrics by the captured icon and unit, not localized labels."""
     if not isinstance(payload, dict):
@@ -470,6 +526,10 @@ class EcoCoachClient:
 
     async def async_awards(self, vin: str, *, all_history: bool = False) -> tuple[PointsAward, ...]:
         """Read vehicle awards without retaining the full private report."""
+        return (await self.async_report(vin, all_history=all_history)).awards
+
+    async def async_report(self, vin: str, *, all_history: bool = False) -> ReportData:
+        """Read awards and optional summaries in the existing single report call."""
         start = (
             "2000-01-01T00:00:00Z"
             if all_history
@@ -481,7 +541,7 @@ class EcoCoachClient:
             {"from": start},
             timeout=90 if all_history else 15,
         )
-        return parse_awards(payload)
+        return ReportData(parse_awards(payload), parse_report_summary(payload))
 
     async def _async_get(
         self, url: str, endpoint: str, params: dict[str, str] | None = None, *, timeout: int = 15
