@@ -85,12 +85,28 @@ POINT_SENSORS = (
     ),
 )
 
+REPORT_SENSORS = tuple(
+    SensorEntityDescription(
+        key=f"report_{metric}",
+        translation_key=f"report_{metric}",
+        icon=icon,
+        suggested_display_precision=precision,
+    )
+    for metric, icon, precision in (
+        ("level_points", "mdi:star-circle", 0),
+        ("current_level", "mdi:stairs", 0),
+        ("level_progress", "mdi:progress-check", 2),
+        ("community_challenges", "mdi:account-group", 0),
+        ("competitive_challenges", "mdi:trophy", 0),
+    )
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: EcoCoachConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Register observed metrics."""
-    descriptions = (*SENSORS, *PERIOD_SENSORS, *POINT_SENSORS)
+    descriptions = (*SENSORS, *PERIOD_SENSORS, *POINT_SENSORS, *REPORT_SENSORS)
     async_add_entities(EcoCoachSensor(entry.runtime_data, entry, description) for description in descriptions)
 
 

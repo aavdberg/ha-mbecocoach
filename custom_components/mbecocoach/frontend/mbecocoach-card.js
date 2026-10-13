@@ -39,6 +39,7 @@ const TEXT = {
     weeklyPeriod: "Weekly summary",
     monthlyPeriod: "Monthly summary",
     history: "Recent awards",
+    tripDetails: "Trip details",
     viewAwards: "View awards →",
     retry: "Try again",
     previous: "Previous",
@@ -69,6 +70,14 @@ const TEXT = {
     weekly_consumption: "Weekly consumption",
     monthly_drive_score: "Monthly drive score",
     monthly_consumption: "Monthly consumption",
+    distance: "Distance",
+    electricConsumption: "Electric consumption",
+    co2Emissions: "CO₂ emissions",
+    duration: "Duration",
+    startTime: "Start time",
+    temperature: "Outside temperature",
+    batteryChange: "Battery change",
+    minutes: "minutes",
   },
   nl: {
     title: "Eco Coach",
@@ -81,6 +90,7 @@ const TEXT = {
     weeklyPeriod: "Weekoverzicht",
     monthlyPeriod: "Maandoverzicht",
     history: "Recente punten",
+    tripDetails: "Ritdetails",
     viewAwards: "Bekijk toekenningen →",
     retry: "Opnieuw proberen",
     previous: "Vorige",
@@ -111,6 +121,14 @@ const TEXT = {
     weekly_consumption: "Wekelijks verbruik",
     monthly_drive_score: "Maandelijkse rijscore",
     monthly_consumption: "Maandelijks verbruik",
+    distance: "Afstand",
+    electricConsumption: "Stroomverbruik",
+    co2Emissions: "CO₂-uitstoot",
+    duration: "Duur",
+    startTime: "Starttijd",
+    temperature: "Buitentemperatuur",
+    batteryChange: "Accuverandering",
+    minutes: "minuten",
   },
 };
 
@@ -137,7 +155,7 @@ const STYLE = `
   .refresh:disabled { cursor: wait; opacity: .65; }
   .clickable { cursor: pointer; font: inherit; text-align: left; color: inherit; }
   .clickable:hover { outline: 2px solid var(--primary-color); }
-  .clickable:focus-visible, .refresh:focus-visible, .paging button:focus-visible {
+  .clickable:focus-visible, .award-summary:focus-visible, .refresh:focus-visible, .paging button:focus-visible {
     outline: 3px solid var(--primary-color); outline-offset: 2px;
   }
   .hero {
@@ -171,14 +189,23 @@ const STYLE = `
     display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center;
     gap: 11px; padding: 10px 2px; border-bottom: 1px solid var(--divider-color);
   }
-  .award:last-child { border-bottom: 0; }
+  .award-item { border-bottom: 1px solid var(--divider-color); }
+  .award-item:last-child { border-bottom: 0; }
+  .award-summary { cursor: pointer; list-style: none; }
+  .award-summary::-webkit-details-marker { display: none; }
   .dot {
     display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
     background: var(--primary-color); color: var(--text-primary-color, #fff); font-weight: 700;
   }
   .award-name { font-weight: 580; }
   .award-date { margin-top: 3px; color: var(--secondary-text-color); font-size: .8rem; }
-  .award-points { white-space: nowrap; font-weight: 700; }
+  .award-trailing { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-weight: 700; }
+  .award-points { font-weight: 700; }
+  .award-chevron { color: var(--secondary-text-color); font-size: 1.1rem; }
+  .drive-details { display: grid; gap: 8px; margin: 0; padding: 0 8px 12px 51px; }
+  .drive-detail { display: flex; justify-content: space-between; gap: 12px; font-size: .85rem; }
+  .drive-detail dt { color: var(--secondary-text-color); }
+  .drive-detail dd { margin: 0; text-align: right; font-weight: 550; }
   .message { margin: 10px 0 0; color: var(--secondary-text-color); font-size: .9rem; }
   .error { color: var(--error-color); }
   @media (max-width: 420px) {
@@ -191,6 +218,74 @@ const STYLE = `
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeDriveDetails(details) {
+  const keys = [
+    "drive_score",
+    "distance_km",
+    "electric_consumption",
+    "co2_emissions_kg",
+    "duration_seconds",
+    "start_time",
+    "temperature_c",
+    "battery_percent_change",
+  ];
+  if (
+    !isRecord(details) ||
+    Object.keys(details).length !== keys.length ||
+    keys.some((key) => !Object.hasOwn(details, key))
+  ) {
+    throw new TypeError("Invalid driving details");
+  }
+  if (keys.every((key) => details[key] === null)) {
+    throw new TypeError("Driving details contain no supported values");
+  }
+  const optionalNumber = (key, { minimum = 0, maximum = Number.POSITIVE_INFINITY } = {}) => {
+    const value = details[key];
+    if (
+      value !== null &&
+      (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum)
+    ) {
+      throw new TypeError(`Invalid driving detail ${key}`);
+    }
+    return value;
+  };
+  const driveScore = optionalNumber("drive_score", { maximum: 100 });
+  const distance = optionalNumber("distance_km");
+  const consumption = optionalNumber("electric_consumption");
+  const emissions = optionalNumber("co2_emissions_kg");
+  const temperature = optionalNumber("temperature_c", {
+    minimum: Number.NEGATIVE_INFINITY,
+  });
+  const duration = details.duration_seconds;
+  if (
+    duration !== null &&
+    (!Number.isInteger(duration) || duration < 0 || duration > 86_400)
+  ) {
+    throw new TypeError("Invalid driving detail duration_seconds");
+  }
+  const batteryChange = details.battery_percent_change;
+  if (
+    batteryChange !== null &&
+    (!Number.isInteger(batteryChange) || batteryChange < -100 || batteryChange > 100)
+  ) {
+    throw new TypeError("Invalid driving detail battery_percent_change");
+  }
+  const startTime = details.start_time;
+  if (startTime !== null && (typeof startTime !== "string" || !Number.isFinite(Date.parse(startTime)))) {
+    throw new TypeError("Invalid driving detail start_time");
+  }
+  return {
+    drive_score: driveScore,
+    distance_km: distance,
+    electric_consumption: consumption,
+    co2_emissions_kg: emissions,
+    duration_seconds: duration,
+    start_time: startTime,
+    temperature_c: temperature,
+    battery_percent_change: batteryChange,
+  };
 }
 
 function getRelatedEntityRecords(registry, selectedEntityId) {
@@ -238,10 +333,14 @@ function normalizeHistoryResponse(response) {
     ) {
       throw new TypeError("Invalid points history award");
     }
+    if (award.drive_details !== undefined && award.category !== "driving") {
+      throw new TypeError("Driving details belong only to driving awards");
+    }
     return {
       category: award.category,
       points: award.points,
       occurred_at: award.occurred_at,
+      ...(award.drive_details === undefined ? {} : { drive_details: normalizeDriveDetails(award.drive_details) }),
     };
   });
   return { total: payload.total, offset: payload.offset, awards };
@@ -310,6 +409,7 @@ class EcoCoachCard extends HTMLElement {
     this._refreshing = false;
     this._refreshError = false;
     this._pendingFocusKey = null;
+    this._openAwardKeys = new Set();
   }
 
   static getConfigElement() {
@@ -374,6 +474,7 @@ class EcoCoachCard extends HTMLElement {
     this._historyError = false;
     this._history = { total: 0, offset: 0, awards: [] };
     this._historyOffset = 0;
+    this._openAwardKeys.clear();
     this._lastHistoryFetch = 0;
     this._refreshError = false;
     this._pendingFocusKey = null;
@@ -524,6 +625,58 @@ class EcoCoachCard extends HTMLElement {
     section.append(heading);
     parent.append(section);
     return section;
+  }
+
+  _createAwardItem(award, index, dateFormatter, labels, language) {
+    const row = document.createElement(award.drive_details ? "summary" : "div");
+    row.className = "award";
+    if (award.drive_details) row.dataset.focusKey = `award:${this._historyOffset + index}`;
+    const dot = document.createElement("div");
+    dot.className = "dot";
+    dot.setAttribute("aria-hidden", "true");
+    dot.textContent = (labels[award.category] || award.category).slice(0, 1).toLocaleUpperCase(language);
+    const detail = document.createElement("div");
+    const name = document.createElement("div");
+    name.className = "award-name";
+    name.textContent = labels[award.category] || award.category;
+    const date = document.createElement("div");
+    date.className = "award-date";
+    date.textContent = dateFormatter.format(new Date(award.occurred_at));
+    detail.append(name, date);
+    const points = document.createElement("div");
+    points.className = "award-points";
+    points.textContent = `+${this._number(award.points)}`;
+    const trailing = document.createElement("div");
+    trailing.className = "award-trailing";
+    trailing.append(points);
+    const item = document.createElement(award.drive_details ? "details" : "div");
+    item.className = "award-item";
+    if (award.drive_details) {
+      const key = `${award.category}:${award.occurred_at}:${award.points}`;
+      item.open = this._openAwardKeys.has(key);
+      item.addEventListener("toggle", () => {
+        if (item.open) this._openAwardKeys.add(key);
+        else this._openAwardKeys.delete(key);
+      });
+      row.classList.add("award-summary");
+      row.setAttribute(
+        "aria-label",
+        `${labels.tripDetails}: ${name.textContent} ${date.textContent} ${points.textContent}`,
+      );
+      const chevron = document.createElement("span");
+      chevron.className = "award-chevron";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.textContent = "⌄";
+      trailing.append(chevron);
+    }
+    row.append(dot, detail, trailing);
+    if (award.drive_details) {
+      item.append(row);
+      this._appendDriveDetails(item, award.drive_details, labels);
+    } else {
+      item.append(row);
+    }
+    return item;
   }
 
   _render() {
@@ -691,26 +844,8 @@ class EcoCoachCard extends HTMLElement {
         dateStyle: "medium",
         timeStyle: "short",
       });
-      for (const award of this._history.awards) {
-        const row = document.createElement("div");
-        row.className = "award";
-        const dot = document.createElement("div");
-        dot.className = "dot";
-        dot.setAttribute("aria-hidden", "true");
-        dot.textContent = (labels[award.category] || award.category).slice(0, 1).toLocaleUpperCase(language);
-        const detail = document.createElement("div");
-        const name = document.createElement("div");
-        name.className = "award-name";
-        name.textContent = labels[award.category] || award.category;
-        const date = document.createElement("div");
-        date.className = "award-date";
-        date.textContent = dateFormatter.format(new Date(award.occurred_at));
-        detail.append(name, date);
-        const points = document.createElement("div");
-        points.className = "award-points";
-        points.textContent = `+${this._number(award.points)}`;
-        row.append(dot, detail, points);
-        awards.append(row);
+      for (const [index, award] of this._history.awards.entries()) {
+        awards.append(this._createAwardItem(award, index, dateFormatter, labels, language));
       }
       historySection.append(awards);
       const paging = document.createElement("div");
@@ -755,7 +890,46 @@ class EcoCoachCard extends HTMLElement {
       } else {
         this._pendingFocusKey = null;
       }
+
     }
+  }
+
+  _appendDriveDetails(parent, details, labels) {
+    const list = document.createElement("dl");
+    list.className = "drive-details";
+    const add = (label, value) => {
+      if (value === null || value === undefined) return;
+      const row = document.createElement("div");
+      row.className = "drive-detail";
+      const term = document.createElement("dt");
+      term.textContent = label;
+      const description = document.createElement("dd");
+      description.textContent = value;
+      row.append(term, description);
+      list.append(row);
+    };
+    const timeFormatter = new Intl.DateTimeFormat(this._hass?.language || "en", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    if (details.drive_score !== null) add(labels.drive_score, `${this._number(details.drive_score, 1)} %`);
+    if (details.distance_km !== null) add(labels.distance, `${this._number(details.distance_km, 1)} km`);
+    if (details.electric_consumption !== null) {
+      add(labels.electricConsumption, `${this._number(details.electric_consumption, 1)} kWh/100 km`);
+    }
+    if (details.co2_emissions_kg !== null) add(labels.co2Emissions, `${this._number(details.co2_emissions_kg, 2)} kg`);
+    if (details.duration_seconds !== null) {
+      add(labels.duration, `${this._number(details.duration_seconds / 60, 1)} ${labels.minutes}`);
+    }
+    if (details.start_time !== null) {
+      add(labels.startTime, timeFormatter.format(new Date(details.start_time)));
+    }
+    if (details.temperature_c !== null) add(labels.temperature, `${this._number(details.temperature_c, 1)} °C`);
+    if (details.battery_percent_change !== null) {
+      add(labels.batteryChange, `${this._number(details.battery_percent_change)} %`);
+    }
+    parent.append(list);
+    return list;
   }
 }
 

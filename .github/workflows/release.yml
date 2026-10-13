@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI, Validate with hassfest, Secret scan]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: publish-release
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create GitHub Release
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Verify trusted commit and validation gates
+        id: gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const gate = require('./.github/scripts/release-gate.cjs');
+            core.setOutput('ready', await gate({github, context, core}));
+      - name: Publish or recover stable release
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: python .github/scripts/publish_release.py stable --sha "$RELEASE_SHA" --repo "$GITHUB_REPOSITORY"

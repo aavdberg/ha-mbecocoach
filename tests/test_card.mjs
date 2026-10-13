@@ -180,6 +180,162 @@ test("normalizes valid award history and rejects unsafe or malformed records", (
   );
 });
 
+test("normalizes only the confirmed driving summary fields", () => {
+  const details = {
+    drive_score: 88,
+    distance_km: 12.4,
+    electric_consumption: 17.8,
+    co2_emissions_kg: null,
+    duration_seconds: 645,
+    start_time: "2026-01-02T02:53:20+00:00",
+    temperature_c: -3.5,
+    battery_percent_change: -4,
+  };
+  const response = cardModule.normalizeHistoryResponse({
+    response: {
+      total: 1,
+      offset: 0,
+      awards: [{
+        category: "driving",
+        points: 42,
+        occurred_at: "2026-01-02T03:04:05+00:00",
+        drive_details: details,
+      }],
+    },
+  });
+  assert.deepEqual(response.awards[0].drive_details, details);
+  assert.throws(
+    () => cardModule.normalizeHistoryResponse({
+      response: {
+        total: 1,
+        offset: 0,
+        awards: [{
+          category: "charging",
+          points: 42,
+          occurred_at: "2026-01-02T03:04:05+00:00",
+          drive_details: details,
+        }],
+      },
+    }),
+    TypeError,
+  );
+  assert.throws(
+    () => cardModule.normalizeHistoryResponse({
+      response: {
+        total: 1,
+        offset: 0,
+        awards: [{
+          category: "driving",
+          points: 42,
+          occurred_at: "2026-01-02T03:04:05+00:00",
+          drive_details: { ...details, distance_km: Number.NaN },
+        }],
+      },
+    }),
+    TypeError,
+  );
+});
+
+test("renders the confirmed location-free driving summary in Dutch", () => {
+  class Element {
+    constructor(tag) {
+      this.tag = tag;
+      this.children = [];
+    }
+    append(...children) { this.children.push(...children); }
+  }
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: (tag) => new Element(tag) };
+  try {
+    const Card = definitions.get("mbecocoach-card");
+    const card = Object.create(Card.prototype);
+    card._hass = { language: "nl" };
+    const parent = new Element("details");
+    const list = card._appendDriveDetails(parent, {
+      drive_score: 88,
+      distance_km: 12.4,
+      electric_consumption: 17.8,
+      co2_emissions_kg: 1.2,
+      duration_seconds: 645,
+      start_time: "2026-01-02T02:53:20+00:00",
+      temperature_c: -3.5,
+      battery_percent_change: -4,
+    }, cardModule.TEXT.nl);
+    assert.equal(parent.children[0], list);
+    const fields = list.children.map((row) => row.children[0].textContent);
+    assert.deepEqual(fields, [
+      "Rijscore",
+      "Afstand",
+      "Stroomverbruik",
+      "CO₂-uitstoot",
+      "Duur",
+      "Starttijd",
+      "Buitentemperatuur",
+      "Accuverandering",
+    ]);
+    assert.match(list.children[0].children[1].textContent, /88/);
+    assert.match(list.children[6].children[1].textContent, /-3,5 °C/);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
+test("preserves expanded trip details across card rerenders", () => {
+  class Element {
+    constructor(tag) {
+      this.tag = tag;
+      this.children = [];
+      this.dataset = {};
+      this.attributes = {};
+      this.listeners = new Map();
+      this.classList = { add() {} };
+    }
+    append(...children) { this.children.push(...children); }
+    addEventListener(type, listener) { this.listeners.set(type, listener); }
+    setAttribute(name, value) { this.attributes[name] = value; }
+  }
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: (tag) => new Element(tag) };
+  try {
+    const Card = definitions.get("mbecocoach-card");
+    const card = Object.create(Card.prototype);
+    card._historyOffset = 0;
+    card._hass = { language: "en" };
+    card._openAwardKeys = new Set();
+    card._number = (value) => String(value);
+    card._appendDriveDetails = () => {};
+    const award = {
+      category: "driving",
+      points: 42,
+      occurred_at: "2026-10-01T12:00:00Z",
+      drive_details: { drive_score: 88 },
+    };
+    const create = () => card._createAwardItem(
+      award,
+      0,
+      new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }),
+      cardModule.TEXT.en,
+      "en",
+    );
+    const first = create();
+    assert.match(first.children[0].attributes["aria-label"], /Driving/);
+    assert.match(first.children[0].attributes["aria-label"], /\+42/);
+    award.category = "synthetic-category";
+    assert.match(create().children[0].attributes["aria-label"], /synthetic-category/);
+    award.category = "driving";
+    assert.equal(first.open, false);
+    first.open = true;
+    first.listeners.get("toggle")();
+    assert.equal(create().open, true);
+    const rerendered = create();
+    rerendered.open = false;
+    rerendered.listeners.get("toggle")();
+    assert.equal(create().open, false);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
 test("requests history through the sixth callService argument and reads the response envelope", async () => {
   const Card = definitions.get("mbecocoach-card");
   const card = Object.create(Card.prototype);

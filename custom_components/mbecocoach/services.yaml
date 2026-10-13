@@ -1,6 +1,6 @@
 get_points_history:
   name: Get point history
-  description: Return a page of locally stored Eco Coach point awards without trip details.
+  description: Return a page of locally stored point awards and location-free driving summaries.
   fields:
     entry_id:
       name: Config entry ID
