@@ -21,8 +21,10 @@ into Home Assistant. It is not affiliated with Mercedes-Benz.
 - Since version 0.8.0, level points, current level, provider progress and challenge counts
   from the existing 15-minute report poll, without extra requests. These are not
   available in older releases. Progress is unitless: its scale is not
-  verified, so it is not converted to a percentage. Only finite numeric level
-  values are accepted; missing or malformed optional fields stay unknown.
+  verified, so it is not converted to a percentage. Numeric level values and
+  the confirmed `PRO` code (displayed as Eco Pro) are accepted; other
+  unconfirmed string codes, missing values and malformed optional fields stay
+  unknown.
   Challenge counts are the lengths of the supplied community/competitive
   lists (empty means zero; missing/invalid means unknown), not inferred
   completion totals. Challenge details, level descriptions and level lists
