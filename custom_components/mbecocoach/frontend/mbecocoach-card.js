@@ -661,7 +661,7 @@ class EcoCoachCard extends HTMLElement {
       row.classList.add("award-summary");
       row.setAttribute(
         "aria-label",
-        `${labels.tripDetails}: ${labels[award.category]} ${dateFormatter.format(new Date(award.occurred_at))}`,
+        `${labels.tripDetails}: ${name.textContent} ${date.textContent} ${points.textContent}`,
       );
       const chevron = document.createElement("span");
       chevron.className = "award-chevron";
