@@ -130,6 +130,10 @@ def test_report_rejects_invalid_awards(event: dict) -> None:
     "details",
     [
         {"driveScore": 101},
+        {"driveScore": 10**400},
+        {"distanceTraveled": {"value": 10**400, "unit": "KM"}},
+        {"electricConsumption": {"value": 10**400, "unit": "KWH100KM"}},
+        {"temperatureAvg": {"value": 10**400, "unit": "CELSIUS"}},
         {"distanceTraveled": {"value": -1, "unit": "KM"}},
         {"electricConsumption": {"value": 10, "unit": "L100KM"}},
         {"durationInSec": -1},

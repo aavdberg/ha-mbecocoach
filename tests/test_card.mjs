@@ -318,6 +318,11 @@ test("preserves expanded trip details across card rerenders", () => {
       "en",
     );
     const first = create();
+    assert.match(first.children[0].attributes["aria-label"], /Driving/);
+    assert.match(first.children[0].attributes["aria-label"], /\+42/);
+    award.category = "synthetic-category";
+    assert.match(create().children[0].attributes["aria-label"], /synthetic-category/);
+    award.category = "driving";
     assert.equal(first.open, false);
     first.open = true;
     first.listeners.get("toggle")();

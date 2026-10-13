@@ -174,7 +174,7 @@ def _optional_drive_value[T](field: str, read: Callable[[], T]) -> T | None:
     """Ignore malformed optional details without rejecting a valid driving award."""
     try:
         return read()
-    except EcoCoachError:
+    except EcoCoachError, OverflowError:
         _LOGGER.warning("Ignoring invalid optional driving detail field %s", field)
         return None
 
