@@ -43,11 +43,11 @@ workflow retries the gate. A manual dispatch on the matching branch can retry
 publication, but fails unless all three push workflows passed that exact SHA.
 Unchanged stable versions do not generate new tags/releases.
 
-**Bootstrap:** the current manifest `0.7.5` already has stable tag `v0.7.5`.
-Publishing `v0.7.5-beta.1` would rank below stable in HACS. Pre-release therefore
-warns and skips until a **separate PR to dev** sets the next development version
-(for example `0.8.0`). This adoption does not change the manifest, publish a
-release or promote to `main`.
+**Current cycle:** stable `v0.8.0` was published from the authorized
+dev-to-main merge. A **separate PR to dev** sets the next development version
+to `0.8.1`, enabling `v0.8.1-beta.N`. Pre-release warns and skips whenever
+the manifest version already has a stable tag, since such a beta would rank
+below stable in HACS.
 
 For an explicitly requested stable release, agree the semantic version and land
 any manifest bump via a normal PR to `dev` first. Open the release PR **dev to
@@ -79,12 +79,11 @@ The setting allowing Actions to *approve* PRs is not needed: this only requests
 a reviewer. Do not change settings, secrets or protection rules to bypass gates.
 
 `workflow_run` definitions must exist on the default branch before GitHub can
-trigger them. This repository's default branch is `main`; adding the workflows
-only to `dev` does **not** activate automatic publication yet. They become
-available after a separately authorized production promotion includes them.
-Likewise an Actions dispatch must be available on the default branch before it
-can be used as a retry. No workflow activation or main promotion is authorized
-by this adoption PR. Actions-created releases do not trigger other token-based
+trigger them. This repository's default branch is `main`; the authorized
+0.8.0 promotion installed the publication workflows there, activating
+automatic publication and dispatch retries. Adding future workflows only
+to `dev` still does not activate them until an authorized promotion.
+Actions-created releases do not trigger other token-based
 workflows, so the dropdown is intentionally refreshed via a separate PR.
 
 ## Source and adaptations
