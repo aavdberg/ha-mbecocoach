@@ -44,6 +44,12 @@ the last seven days; personal statistics use local Monday-Sunday weeks.
 Daily/weekly/monthly aggregates have provider-defined boundaries.
 Missing metrics remain unknown, not zero. Never add inferred metrics,
 unverified CO2 semantics, routes, locations or raw response attributes.
+The existing report poll also extracts finite numeric `userLevel.points`,
+`currentLevel` and `progress`, plus lengths of `activeCommunityChallenges`
+and `competitiveChallenges` lists. Progress has no verified scale/unit; do
+not label it as a percentage. Missing/invalid optional fields stay unknown.
+Level descriptions/lists and challenge contents are discarded, never cached
+or exposed as attributes. Nested challenge schemas remain unverified.
 
 Never expose credentials, tokens, callbacks, identifiers, raw captures or trip
 details in logs, fixtures, issues or review comments. Use only synthetic data.

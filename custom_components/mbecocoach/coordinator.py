@@ -76,11 +76,11 @@ class EcoCoachCoordinator(DataUpdateCoordinator[EcoCoachData]):
             personal = await self._client.async_personal_statistics(self._vin)
             daily, weekly, monthly = await self._client.async_period_statistics(self._vin)
             points = await self._client.async_points()
-            awards = await self._client.async_awards(self._vin)
+            report = await self._client.async_report(self._vin)
             if self.history is not None:
                 async with self._history_lock:
-                    await self.history.async_merge(awards)
-            return EcoCoachData(personal, daily, weekly, monthly, points, awards)
+                    await self.history.async_merge(report.awards)
+            return EcoCoachData(personal, daily, weekly, monthly, points, report.awards, report.summary)
         except EcoCoachAuthError as err:
             raise ConfigEntryAuthFailed("Eco Coach token expired or was rejected") from err
         except EcoCoachError as err:

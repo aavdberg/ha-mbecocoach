@@ -18,6 +18,15 @@ into Home Assistant. It is not affiliated with Mercedes-Benz.
   and browsable award history.
 - On `dev`, expandable driving awards with whitelisted, location-free trip
   summaries; this feature is not yet in published `main` releases.
+- On `dev`, level points, current level, provider progress and challenge counts
+  from the existing 15-minute report poll, without extra requests. These are not
+  yet in published `main` releases. Progress is unitless: its scale is not
+  verified, so it is not converted to a percentage. Only finite numeric level
+  values are accepted; missing or malformed optional fields stay unknown.
+  Challenge counts are the lengths of the supplied community/competitive
+  lists (empty means zero; missing/invalid means unknown), not inferred
+  completion totals. Challenge details, level descriptions and level lists
+  are discarded and never become entity attributes or cached history.
 
 ## Requirements
 

@@ -9,7 +9,7 @@ import pytest
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from custom_components.mbecocoach.api import EcoCoachAuthError, EcoCoachError
+from custom_components.mbecocoach.api import EcoCoachAuthError, EcoCoachError, ReportData, ReportSummary
 from custom_components.mbecocoach.const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, CONF_VIN
 from custom_components.mbecocoach.coordinator import EcoCoachCoordinator
 from custom_components.mbecocoach.oauth import TokenSet
@@ -25,7 +25,9 @@ async def test_refresh_rotates_tokens_before_polling() -> None:
     client.async_personal_statistics = AsyncMock()
     client.async_period_statistics = AsyncMock(return_value=(1, 2, 3))
     client.async_points = AsyncMock()
-    client.async_awards = AsyncMock(return_value=())
+    summary = ReportSummary(120, 2, 0.25, 1, 0)
+    client.async_report = AsyncMock(return_value=ReportData((), summary))
+    client.async_awards = AsyncMock()
     entry = MagicMock()
     entry.data = {
         CONF_VIN: VIN,
@@ -42,7 +44,10 @@ async def test_refresh_rotates_tokens_before_polling() -> None:
         result = await coordinator._async_update_data()
     assert result.daily == 1
     client.async_points.assert_awaited_once()
-    client.async_awards.assert_awaited_once_with(VIN)
+    assert result.report == summary
+    assert result.awards == ()
+    client.async_report.assert_awaited_once_with(VIN)
+    client.async_awards.assert_not_awaited()
     refresh.assert_awaited_once()
     client.set_token.assert_called_once_with("new")
     persisted = hass.config_entries.async_update_entry.call_args.kwargs["data"]
