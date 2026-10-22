@@ -94,7 +94,7 @@ REPORT_SENSORS = tuple(
     )
     for metric, icon, precision in (
         ("level_points", "mdi:star-circle", 0),
-        ("current_level", "mdi:stairs", 0),
+        ("current_level", "mdi:stairs", None),
         ("level_progress", "mdi:progress-check", 2),
         ("community_challenges", "mdi:account-group", 0),
         ("competitive_challenges", "mdi:trophy", 0),
