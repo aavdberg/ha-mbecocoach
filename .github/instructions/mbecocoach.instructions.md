@@ -22,7 +22,10 @@ Target Python 3.14 and Home Assistant 2026.9.
 - `config_flow.py`, `oauth.py` and `direct_login.py` handle browser PKCE,
   optional direct login, manual tokens and reauthentication. Direct login does
   not persist passwords and cannot guarantee MFA/consent support. Live initial
-  login succeeded; live refresh-token expiry/rotation remains unverified.
+  login succeeded. Live automatic renewal and continued polling were confirmed
+  on 2026-10-13 without reauthentication on HA 2026.10.0 (issue #4, closed),
+  not the target HA 2026.9. Refresh-token value replacement was not independently
+  compared; synthetic tests cover rotation.
 - `points_history.py` uses private local HA storage per entry, caching only
   award metadata and a strict location-free driving-summary whitelist.
   Re-import replaces this cache, not HA recorder history. Failed imports must
