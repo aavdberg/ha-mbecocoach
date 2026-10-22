@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -206,7 +207,13 @@ def test_report_sensors_have_no_private_attributes(
         report=summary,
     )
     entity = EcoCoachSensor(coordinator, MagicMock(data={CONF_VIN: "synthetic-vehicle"}), description)
+    entity.platform_data = SimpleNamespace(
+        platform_name="mbecocoach",
+        domain="sensor",
+        default_language_platform_translations={},
+    )
     assert entity.native_value == getattr(summary, description.key.removeprefix("report_"))
+    assert entity.state == entity.native_value
     assert entity.unique_id == f"synthetic-vehicle_{description.key}"
     other = EcoCoachSensor(coordinator, MagicMock(data={CONF_VIN: "other-synthetic-vehicle"}), description)
     assert other.unique_id != entity.unique_id
