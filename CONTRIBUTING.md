@@ -43,9 +43,9 @@ workflow retries the gate. A manual dispatch on the matching branch can retry
 publication, but fails unless all three push workflows passed that exact SHA.
 Unchanged stable versions do not generate new tags/releases.
 
-**Current cycle:** stable `v0.8.0` was published from the authorized
+**Current cycle:** stable `v0.8.1` was published from the authorized
 dev-to-main merge. A **separate PR to dev** sets the next development version
-to `0.8.1`, enabling `v0.8.1-beta.N`. Pre-release warns and skips whenever
+to `0.8.2`, enabling `v0.8.2-beta.N`. Pre-release warns and skips whenever
 the manifest version already has a stable tag, since such a beta would rank
 below stable in HACS.
 
