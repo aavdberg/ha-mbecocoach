@@ -94,7 +94,7 @@ REPORT_SENSORS = tuple(
     )
     for metric, icon, precision in (
         ("level_points", "mdi:star-circle", 0),
-        ("current_level", "mdi:stairs", 0),
+        ("current_level", "mdi:stairs", None),
         ("level_progress", "mdi:progress-check", 2),
         ("community_challenges", "mdi:account-group", 0),
         ("competitive_challenges", "mdi:trophy", 0),
@@ -130,7 +130,7 @@ class EcoCoachSensor(CoordinatorEntity[EcoCoachCoordinator], SensorEntity):
         }
 
     @property
-    def native_value(self) -> float | None:
+    def native_value(self) -> float | str | None:
         """Return the captured metric or unknown when absent."""
         if self.entity_description.key == "account_total_points":
             return self.coordinator.data.points.total if self.coordinator.data.points is not None else None

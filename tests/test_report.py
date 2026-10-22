@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -98,6 +99,17 @@ def test_zero_and_provider_progress_scale_are_preserved() -> None:
     ) == ReportSummary(0.0, 0.0, 37.5, 0, 0)
 
 
+def test_confirmed_pro_level_code_is_displayed_as_eco_pro() -> None:
+    summary = parse_report_summary({"userLevel": {"currentLevel": "PRO"}})
+    assert summary.current_level == "Eco Pro"
+
+
+def test_unconfirmed_level_code_stays_unknown(caplog: pytest.LogCaptureFixture) -> None:
+    summary = parse_report_summary({"userLevel": {"currentLevel": "UNVERIFIED_LEVEL_CODE"}})
+    assert summary.current_level is None
+    assert "UNVERIFIED_LEVEL_CODE" not in caplog.text
+
+
 def test_malformed_optional_field_does_not_hide_other_values() -> None:
     assert parse_report_summary(
         {
@@ -177,7 +189,14 @@ async def test_report_errors_preserve_coordinator_failure_behavior(error: Except
 
 
 @pytest.mark.parametrize("description", REPORT_SENSORS, ids=lambda description: description.key)
-@pytest.mark.parametrize("summary", [ReportSummary(100.0, 2.0, 0.125, 1, 0), ReportSummary(0, 0, 0, 0, 0)])
+@pytest.mark.parametrize(
+    "summary",
+    [
+        ReportSummary(100.0, 2.0, 0.125, 1, 0),
+        ReportSummary(1234.0, "Eco Pro", 0.28, 5, 0),
+        ReportSummary(0, 0, 0, 0, 0),
+    ],
+)
 def test_report_sensors_have_no_private_attributes(
     description: SensorEntityDescription, summary: ReportSummary
 ) -> None:
@@ -188,7 +207,13 @@ def test_report_sensors_have_no_private_attributes(
         report=summary,
     )
     entity = EcoCoachSensor(coordinator, MagicMock(data={CONF_VIN: "synthetic-vehicle"}), description)
+    entity.platform_data = SimpleNamespace(
+        platform_name="mbecocoach",
+        domain="sensor",
+        default_language_platform_translations={},
+    )
     assert entity.native_value == getattr(summary, description.key.removeprefix("report_"))
+    assert entity.state == entity.native_value
     assert entity.unique_id == f"synthetic-vehicle_{description.key}"
     other = EcoCoachSensor(coordinator, MagicMock(data={CONF_VIN: "other-synthetic-vehicle"}), description)
     assert other.unique_id != entity.unique_id

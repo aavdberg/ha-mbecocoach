@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -17,6 +16,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from homeassistant.util import dt as dt_util
 
 from .api import EcoCoachAuthError, EcoCoachClient, EcoCoachConnectionError, EcoCoachError
 from .const import CONF_EXPIRES_AT, CONF_REFRESH_TOKEN, CONF_TOKEN, CONF_VIN, DOMAIN
@@ -81,7 +81,9 @@ class EcoCoachConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def _verify(self, vin: str, token: str) -> None:
-        client = EcoCoachClient(async_get_clientsession(self.hass), token, ZoneInfo(self.hass.config.time_zone))
+        timezone = await dt_util.async_get_time_zone(self.hass.config.time_zone)
+        assert timezone is not None
+        client = EcoCoachClient(async_get_clientsession(self.hass), token, timezone)
         try:
             await client.async_personal_statistics(vin)
         except EcoCoachError as err:

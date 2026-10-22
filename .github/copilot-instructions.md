@@ -10,13 +10,31 @@
   numeric metrics), and also shows `/api/v5/{VIN}/report`,
   `/api/v5/{VIN}/statistics/all`, and `/api/v5/user/points`.
 - Browser-assisted and optional direct Eco Coach login have passed a private
-  real-account test. Automatic refresh-token rotation is implemented and covered
-  by synthetic tests, but remains unverified at a live token expiry.
+  real-account test. Live automatic token renewal and continued polling were
+  confirmed on 2026-10-13 after more than a week without reauthentication
+  (issue #4, closed). That instance ran HA 2026.10.0, not the target 2026.9.
+  Refresh-token value replacement was not independently compared; rotation
+  remains covered by synthetic tests.
 - Never commit or log actual credentials, tokens, callback URLs, VINs, captures,
   trip data or private personal information. Use synthetic fixtures in tests.
   Do not enable HTTP wire logging or include raw HA logs in issues/reviews.
 - Keep persistent instructions accurate when architecture or evidence changes;
   see `.github/instructions/mbecocoach.instructions.md` for scoped code guidance.
+
+## Local Home Assistant environment
+
+- The user's local HA instance uses **WSLC (Windows Subsystem for Linux
+  Container CLI)**, not Docker Desktop or Docker inside a WSL distribution.
+  Use `wslc` directly from Windows PowerShell; consult `wslc --help` and
+  command-specific help rather than assuming Docker options.
+- The container verified on 2026-10-13 was `9c95f55d2ea7`. Confirm the current
+  container before inspection, since it may be replaced. Use
+  `wslc start <container-id>` when starting it is authorized, then
+  `wslc exec <container-id> <command> [arguments...]` to inspect it.
+- HA configuration is under `/config` inside the Linux container. Keep
+  inspection read-only and emit only safe lifecycle timestamps, presence flags
+  or aggregate availability/error counts. Never print complete config entries,
+  token values, raw logs, sensor values or account identifiers.
 
 ## Development workflow
 
@@ -61,8 +79,9 @@ promote to `main` without an **explicit user release request**.
   for CI, hassfest and secret scanning on the exact trusted branch commit.
 - The manifest contains a plain semantic version (`X.Y.Z`), not a beta suffix.
   Before publishing betas for a new cycle, land a **separate normal PR to dev**
-  setting the next development version. The current `0.7.5` is already stable:
-  betas are deliberately skipped until that PR lands (e.g. `0.8.0`).
+  setting the next development version. Stable `0.8.0` is published; `dev`
+  uses `0.8.1` for the next beta cycle. Betas are skipped if the manifest
+  version already has a stable tag.
 - Choose the stable target version with the user. Land any required manifest
   bump via a normal PR to `dev` before opening the release PR.
   Discuss breaking changes/major version bumps explicitly.

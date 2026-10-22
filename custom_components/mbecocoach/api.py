@@ -66,10 +66,10 @@ class EcoCoachData:
 
 @dataclass(frozen=True)
 class ReportSummary:
-    """Optional numeric level fields and counts, never raw challenge details."""
+    """Optional level summaries and counts, never raw challenge details."""
 
     level_points: float | None
-    current_level: float | None
+    current_level: float | str | None
     level_progress: float | None
     community_challenges: int | None
     competitive_challenges: int | None
@@ -368,11 +368,14 @@ def parse_report_summary(payload: Any) -> ReportSummary:
         _LOGGER.warning("Ignoring invalid optional report field userLevel")
         level = None
 
-    def number(key: str) -> float | None:
+    def number(key: str) -> float | str | None:
         if level is None:
             return None
+        value = level.get(key)
+        if key == "currentLevel" and value == "PRO":
+            return "Eco Pro"
         try:
-            return _number(level.get(key), key)
+            return _number(value, key)
         except EcoCoachError, OverflowError:
             _LOGGER.warning("Ignoring invalid optional report level field %s", key)
             return None
