@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 import voluptuous as vol
@@ -250,8 +251,14 @@ async def test_statistics_verification_logs_only_failing_step(
     flow = EcoCoachConfigFlow()
     flow.hass = MagicMock()
     flow.hass.config.time_zone = "Europe/Amsterdam"
+    timezone = ZoneInfo("Europe/Amsterdam")
     with (
         patch("custom_components.mbecocoach.config_flow.async_get_clientsession"),
+        patch(
+            "custom_components.mbecocoach.config_flow.dt_util.async_get_time_zone",
+            new_callable=AsyncMock,
+            return_value=timezone,
+        ) as get_time_zone,
         patch("custom_components.mbecocoach.config_flow.EcoCoachClient") as client,
     ):
         client.return_value.async_personal_statistics = AsyncMock()
@@ -264,6 +271,8 @@ async def test_statistics_verification_logs_only_failing_step(
         method.side_effect = EcoCoachError("a response body must not be logged")
         with pytest.raises(EcoCoachError):
             await flow._verify(VIN, "private-access-token")
+        get_time_zone.assert_awaited_once_with("Europe/Amsterdam")
+        assert client.call_args.args[2] is timezone
     assert f"Eco Coach {failing_step} statistics verification failed (EcoCoachError)" in caplog.text
     assert VIN not in caplog.text
     assert "private-access-token" not in caplog.text

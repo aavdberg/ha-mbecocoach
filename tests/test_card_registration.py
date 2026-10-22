@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -25,15 +26,24 @@ async def test_card_is_served_once_and_loaded_while_any_entry_is_active() -> Non
 
     with (
         patch("custom_components.mbecocoach.EcoCoachCoordinator") as coordinator,
+        patch("custom_components.mbecocoach.EcoCoachClient") as client,
         patch("custom_components.mbecocoach.add_extra_js_url") as add_js,
         patch("custom_components.mbecocoach.remove_extra_js_url") as remove_js,
         patch("custom_components.mbecocoach.async_get_clientsession"),
+        patch(
+            "custom_components.mbecocoach.dt_util.async_get_time_zone",
+            new_callable=AsyncMock,
+            return_value=ZoneInfo("Europe/Amsterdam"),
+        ) as get_time_zone,
     ):
         assert await async_setup(hass, {}) is True
         coordinator.return_value.async_config_entry_first_refresh = AsyncMock()
         coordinator.return_value.async_initialize_history = AsyncMock()
         await async_setup_entry(hass, first)
         await async_setup_entry(hass, second)
+        assert get_time_zone.await_count == 2
+        get_time_zone.assert_awaited_with("Europe/Amsterdam")
+        assert client.call_args.args[2] is get_time_zone.return_value
         hass.http.async_register_static_paths.assert_awaited_once()
         paths = hass.http.async_register_static_paths.await_args.args[0]
         assert len(paths) == 1

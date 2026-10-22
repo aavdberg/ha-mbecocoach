@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import voluptuous as vol
 from homeassistant.components.frontend import add_extra_js_url, remove_extra_js_url
@@ -13,6 +12,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import ConfigEntrySelector, ConfigEntrySelectorConfig
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util import dt as dt_util
 
 from .api import EcoCoachClient
 from .const import CONF_TOKEN, CONF_VIN, DOMAIN
@@ -34,7 +34,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: EcoCoachConfigEntry) -> bool:
     """Set up statistics for a configured VIN."""
-    client = EcoCoachClient(async_get_clientsession(hass), entry.data[CONF_TOKEN], ZoneInfo(hass.config.time_zone))
+    timezone = await dt_util.async_get_time_zone(hass.config.time_zone)
+    assert timezone is not None
+    client = EcoCoachClient(async_get_clientsession(hass), entry.data[CONF_TOKEN], timezone)
     coordinator = EcoCoachCoordinator(hass, client, entry.data[CONF_VIN], entry)
     await coordinator.async_config_entry_first_refresh()
     await coordinator.async_initialize_history()
