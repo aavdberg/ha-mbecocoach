@@ -79,8 +79,8 @@ promote to `main` without an **explicit user release request**.
   for CI, hassfest and secret scanning on the exact trusted branch commit.
 - The manifest contains a plain semantic version (`X.Y.Z`), not a beta suffix.
   Before publishing betas for a new cycle, land a **separate normal PR to dev**
-  setting the next development version. Stable `0.8.0` is published; `dev`
-  uses `0.8.1` for the next beta cycle. Betas are skipped if the manifest
+  setting the next development version. Stable `0.8.1` is published; `dev`
+  uses `0.8.2` for the next beta cycle. Betas are skipped if the manifest
   version already has a stable tag.
 - Choose the stable target version with the user. Land any required manifest
   bump via a normal PR to `dev` before opening the release PR.

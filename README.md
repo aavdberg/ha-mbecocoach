@@ -37,12 +37,14 @@ into Home Assistant. It is not affiliated with Mercedes-Benz.
 
 ## Install via HACS
 
+Open **HACS**, search for **Mercedes Eco Coach**, and download the integration.
+Restart Home Assistant after downloading.
+
 [![Open the repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=aavdberg&repository=ha-mbecocoach&category=integration)
 
-Until the [HACS default-catalog submission](https://github.com/hacs/default/pull/11495)
-is accepted, add `https://github.com/aavdberg/ha-mbecocoach` to **HACS →
-Custom repositories** as an **Integration**. Download **Mercedes Eco Coach**
-and restart Home Assistant. Alternatively, copy
+As an alternative, add `https://github.com/aavdberg/ha-mbecocoach` to **HACS →
+Custom repositories** as an **Integration**, then download it and restart Home
+Assistant. For manual installation, copy
 `custom_components/mbecocoach` from `main` into
 `/config/custom_components/` and restart.
 
